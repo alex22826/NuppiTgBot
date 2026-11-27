@@ -1,25 +1,108 @@
-<section class="users"><h2>Задания для визитов</h2>
-<form class="employee-form" method="post" action="{% url 'add_visit_assignment' %}">{% csrf_token %}<h3>Новое задание</h3><label>Медик<select name="medic_telegram_id"><option value="">Все медики</option>{% for item in registered_users %}{% if item.role == 'Медик' and item.is_active %}<option value="{{ item.telegram_id }}">{{ item.full_name }}</option>{% endif %}{% endfor %}</select></label><label>Город<input name="city" value="{{ selected_city }}" required></label><label>Роддом<input name="maternity_hospital" value="{{ selected_hospital }}" required></label><label>Врач (необязательно)<input name="doctor_name"></label><label>Нужный продукт<input name="required_product" placeholder="Например: NUPPI 1"></label><label>Нужный материал<input name="required_material" placeholder="Например: Эталонный дизайн"></label><label>С даты<input type="date" name="date_from"></label><label>По дату<input type="date" name="date_to"></label><button>Добавить задание</button></form>
-<p class="note">Задание привязывается к следующему визиту с совпадающими городом, роддомом, врачом и периодом. Для медиков порядок отправки фотографий не меняется.</p>
-{% if assignments %}<div class="table-wrap"><table><thead><tr><th>Медик</th><th>Точка</th><th>Врач</th><th>Продукт</th><th>Материал</th><th>Период</th><th></th></tr></thead><tbody>{% for item in assignments %}<tr><td>{{ item.medic_name }}</td><td>{{ item.city }} · {{ item.maternity_hospital }}</td><td>{{ item.doctor_name|default:'Любой' }}</td><td>{{ item.required_product|default:'—' }}</td><td>{{ item.required_material|default:'—' }}</td><td>{{ item.date_from|default:'без ограничения' }} — {{ item.date_to|default:'без ограничения' }}</td><td><form method="post" action="{% url 'delete_visit_assignment' item.id %}" onsubmit="return confirm('Удалить это задание?')">{% csrf_token %}<button class="danger">Удалить</button></form></td></tr>{% endfor %}</tbody></table></div>{% endif %}</section>
-<section class="users"><h2>Управление роддомами</h2>
-<form class="employee-form" method="post" action="{% url 'rename_hospital' %}">{% csrf_token %}
-<h3>Переименовать или объединить роддом</h3>
-<label>Город<input name="city" value="{{ selected_city }}" placeholder="Например: Самарканд" required></label>
-<label>Текущее название<input name="old_name" value="{{ selected_hospital }}" placeholder="Старое название роддома" required></label>
-<label>Новое название<input name="new_name" placeholder="Новое название роддома" required></label>
-<button>Переименовать и перенести фотографии</button></form>
-<p class="note">Все фотографии и назначения сотрудников со старым названием перейдут в новое. Если новое название уже существует, записи будут объединены без дублей.</p>
+<nav class="subnav" aria-label="Разделы управления">
+<a href="#employees">Сотрудники</a>
+<a href="#operators">Входы на сайт</a>
+<a href="#assignments">Задания для визитов</a>
+<a href="#hospitals">Роддома</a>
+<a class="danger-link" href="#cleanup">Удаление фото</a>
+</nav>
+
+<section class="panel manage-section" id="employees" aria-labelledby="employees-title">
+<div class="panel-head">
+<div><h2 id="employees-title">Сотрудники бота</h2><p>Медики отправляют фото, операторы получают отчёты в боте. Добавленный здесь человек сразу получает доступ к боту.</p></div>
+</div>
+<details class="add-box"{% if not registered_users %} open{% endif %}>
+<summary class="btn">+ Добавить сотрудника</summary>
+<form class="panel" method="post" action="{% url 'add_employee' %}">{% csrf_token %}
+<div class="panel-head"><h3>Новый сотрудник</h3></div>
+<div class="form-grid">
+<label class="field"><span>Telegram ID</span><input name="telegram_id" inputmode="numeric" placeholder="Человек узнаёт его командой /my_id" required></label>
+<label class="field"><span>ФИО</span><input name="full_name" required></label>
+<label class="field"><span>Роль</span><select name="role"><option>Медик</option><option>Оператор</option></select></label>
+<label class="field"><span>Город</span><input name="city" required></label>
+<label class="field span-2"><span>Роддома через запятую</span><input name="maternity_hospital" placeholder="Роддом №1, Роддом №4" required></label>
+<label class="field"><span>Username в Telegram (необязательно)</span><input name="username" placeholder="без @"></label>
+</div>
+<div class="form-actions"><button>Добавить и открыть доступ</button></div>
+</form>
+</details>
+{% if registered_users %}
+<div class="table-wrap has-menus" style="margin-top:14px"><table>
+<thead><tr><th>Сотрудник</th><th>Роль</th><th>Telegram ID</th><th class="num">Фото</th><th>Доступ</th><th></th></tr></thead>
+<tbody>{% for item in registered_users %}<tr{% if not item.is_active %} class="row-off"{% endif %}>
+<td><b>{{ item.full_name }}</b><small>{{ item.city|default:'' }}{% if item.username %} · @{{ item.username }}{% endif %}</small></td>
+<td>{{ item.role }}</td>
+<td>{{ item.telegram_id }}</td>
+<td class="num">{{ item.photo_count }}</td>
+<td>{% if item.is_active %}<span class="tag on">Открыт</span>{% else %}<span class="tag off">Отключён</span>{% endif %}</td>
+<td><div class="cell-actions">
+<a class="btn btn-secondary btn-sm" href="{% url 'edit_employee' item.telegram_id %}">Изменить</a>
+<details class="menu"><summary class="btn btn-ghost btn-sm" aria-label="Ещё действия">Ещё ▾</summary>
+<div class="menu-list">
+{% if item.is_active %}<form method="post" action="{% url 'disable_user' item.telegram_id %}" onsubmit="return confirm('Отключить доступ к боту для «{{ item.full_name|escapejs }}»?')">{% csrf_token %}<button class="btn-ghost btn-sm">Отключить доступ к боту</button></form>{% endif %}
+{% if item.role == 'Медик' and item.photo_count %}<form method="post" action="{% url 'delete_employee_photos' item.telegram_id %}" onsubmit="return confirm('Удалить все фотографии медика «{{ item.full_name|escapejs }}»? Будет удалено: {{ item.photo_count }}. Восстановить фотографии будет невозможно.')">{% csrf_token %}<button class="btn-danger-outline btn-sm">Удалить все фото ({{ item.photo_count }})</button></form>{% endif %}
+<form method="post" action="{% url 'delete_employee' item.telegram_id %}" onsubmit="return confirm('Полностью удалить сотрудника? Доступ и профиль будут удалены, но фото останутся в базе.')">{% csrf_token %}<button class="btn-danger-outline btn-sm">Удалить сотрудника</button></form>
+</div></details>
+</div></td>
+</tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
 </section>
-<section class="users"><h2>Сотрудники</h2>
-<form class="employee-form" method="post" action="{% url 'delete_filtered_photos' %}" onsubmit="return confirm('Удалить фотографии, совпадающие по выбранному сотруднику, роддому и дате отправки? Восстановить их будет невозможно.')">{% csrf_token %}
-<h3>Удалить фотографии по сотруднику, роддому и дате</h3>
-<label>Сотрудник<select name="telegram_id" required><option value="">Выберите сотрудника</option>{% for item in registered_users %}{% if item.photo_count %}<option value="{{ item.telegram_id }}">{{ item.full_name }} — {{ item.photo_count }} фото</option>{% endif %}{% endfor %}</select></label>
-<label>Роддом<select name="location" required><option value="">Выберите роддом</option>{% for location in photo_delete_locations %}<option value="{{ location.value }}">{{ location.city }} · {{ location.hospital }}</option>{% endfor %}</select></label>
-<label>Дата отправки<input type="date" name="sent_date" value="{{ today_date|date:'Y-m-d' }}" required></label>
-<button class="danger">Удалить выбранные фотографии</button></form>
-<p class="note">Удалятся только фотографии, у которых одновременно совпадают сотрудник, роддом и дата отправки по времени Ташкента. Профиль сотрудника останется.</p>
-<form class="employee-form" method="post" action="{% url 'add_employee' %}">{% csrf_token %}
-<h3>Добавить сотрудника</h3><input name="telegram_id" inputmode="numeric" placeholder="Telegram ID" required><input name="full_name" placeholder="ФИО" required><input name="username" placeholder="Username без @ (необязательно)"><input name="city" placeholder="Город" required><input name="maternity_hospital" placeholder="Роддома через запятую: 1 Роддом, 2 Роддом" required><select name="role"><option>Медик</option><option>Оператор</option></select><button>Добавить и разрешить доступ</button></form>
-<p class="note">Добавление через сайт сразу разрешает человеку доступ к закрытому боту.</p><div class="table-wrap"><table><thead><tr><th>ФИО</th><th>Telegram ID</th><th>Роль</th><th></th></tr></thead><tbody>{% for item in registered_users %}<tr><td>{{ item.full_name }}<small>@{{ item.username|default:'—' }}</small></td><td>{{ item.telegram_id }}</td><td>{{ item.role }}</td><td><a class="button-link" href="{% url 'edit_employee' item.telegram_id %}">Изменить</a>{% if item.is_active %}<form method="post" action="{% url 'disable_user' item.telegram_id %}" onsubmit="return confirm('Отключить этому пользователю доступ к боту?')">{% csrf_token %}<button class="danger">Отключить доступ</button></form>{% endif %}{% if item.role == 'Медик' and item.photo_count %}<form method="post" action="{% url 'delete_employee_photos' item.telegram_id %}" onsubmit="return confirm('Удалить все фотографии медика «{{ item.full_name|escapejs }}»? Будет удалено: {{ item.photo_count }}. Восстановить фотографии будет невозможно.')">{% csrf_token %}<button class="danger">Удалить все фото ({{ item.photo_count }})</button></form>{% endif %}<form method="post" action="{% url 'delete_employee' item.telegram_id %}" onsubmit="return confirm('Полностью удалить сотрудника? Доступ и профиль будут удалены, но фото останутся в базе.')">{% csrf_token %}<button class="danger">Удалить сотрудника</button></form></td></tr>{% endfor %}</tbody></table></div>
-<form class="employee-form" method="post" action="{% url 'add_site_operator' %}">{% csrf_token %}<h3>Создать вход оператору на сайт</h3><input name="site_username" placeholder="Логин оператора" required><input name="site_password" type="password" placeholder="Пароль (минимум 8 символов)" required><button>Создать доступ оператора</button></form><p class="note">Оператор может просматривать фотографии, скачивать отчёты и вручную ставить итог: «Принять», «На проверку» или «Отклонить». Управление сотрудниками ему недоступно.</p></section>
+
+<section class="panel manage-section" id="operators" aria-labelledby="operators-title">
+<div class="panel-head"><div><h2 id="operators-title">Входы операторов на сайт</h2><p>Оператор видит фото, ставит решения и скачивает отчёты. Управление ему недоступно.</p></div></div>
+<form method="post" action="{% url 'add_site_operator' %}">{% csrf_token %}
+<div class="form-grid">
+<label class="field"><span>Логин</span><input name="site_username" autocomplete="off" required></label>
+<label class="field"><span>Пароль</span><input name="site_password" type="password" autocomplete="new-password" placeholder="Не короче 8 символов" required></label>
+<div><button>Создать вход</button></div>
+</div>
+</form>
+</section>
+
+<section class="panel manage-section" id="assignments" aria-labelledby="assignments-title">
+<div class="panel-head"><div><h2 id="assignments-title">Задания для визитов</h2><p>Задание привязывается к следующему визиту с тем же городом, роддомом, врачом и периодом. Медикам порядок отправки фото не меняется.</p></div></div>
+<details class="add-box">
+<summary class="btn">+ Новое задание</summary>
+<form class="panel" method="post" action="{% url 'add_visit_assignment' %}">{% csrf_token %}
+<div class="form-grid">
+<label class="field"><span>Медик</span><select name="medic_telegram_id"><option value="">Все медики</option>{% for item in registered_users %}{% if item.role == 'Медик' and item.is_active %}<option value="{{ item.telegram_id }}">{{ item.full_name }}</option>{% endif %}{% endfor %}</select></label>
+<label class="field"><span>Город</span><input name="city" value="{{ selected_city }}" required></label>
+<label class="field"><span>Роддом</span><input name="maternity_hospital" value="{{ selected_hospital }}" required></label>
+<label class="field"><span>Врач (необязательно)</span><input name="doctor_name"></label>
+<label class="field"><span>Нужный продукт</span><input name="required_product" placeholder="Например: NUPPI 1"></label>
+<label class="field"><span>Нужный материал</span><input name="required_material" placeholder="Например: эталонный дизайн"></label>
+<label class="field"><span>С даты</span><input type="date" name="date_from"></label>
+<label class="field"><span>По дату</span><input type="date" name="date_to"></label>
+</div>
+<div class="form-actions"><button>Добавить задание</button></div>
+</form>
+</details>
+{% if assignments %}<div class="table-wrap" style="margin-top:14px"><table>
+<thead><tr><th>Медик</th><th>Где</th><th>Врач</th><th>Продукт</th><th>Материал</th><th>Период</th><th></th></tr></thead>
+<tbody>{% for item in assignments %}<tr><td>{{ item.medic_name }}</td><td>{{ item.city }} · {{ item.maternity_hospital }}</td><td>{{ item.doctor_name|default:'Любой' }}</td><td>{{ item.required_product|default:'—' }}</td><td>{{ item.required_material|default:'—' }}</td><td>{{ item.date_from|default:'…' }} — {{ item.date_to|default:'…' }}</td><td><div class="cell-actions"><form method="post" action="{% url 'delete_visit_assignment' item.id %}" onsubmit="return confirm('Удалить это задание?')">{% csrf_token %}<button class="btn-danger-outline btn-sm">Удалить</button></form></div></td></tr>{% endfor %}</tbody>
+</table></div>{% else %}<p class="hint" style="margin-top:12px">Заданий пока нет.</p>{% endif %}
+</section>
+
+<section class="panel manage-section" id="hospitals" aria-labelledby="hospitals-title">
+<div class="panel-head"><div><h2 id="hospitals-title">Переименовать или объединить роддом</h2><p>Все фото и назначения со старым названием перейдут в новое. Если новое название уже есть — записи объединятся без дублей.</p></div></div>
+<form method="post" action="{% url 'rename_hospital' %}">{% csrf_token %}
+<div class="form-grid">
+<label class="field"><span>Город</span><input name="city" value="{{ selected_city }}" placeholder="Например: Самарканд" required></label>
+<label class="field"><span>Сейчас называется</span><input name="old_name" value="{{ selected_hospital }}" required></label>
+<label class="field"><span>Новое название</span><input name="new_name" required></label>
+<div><button>Переименовать</button></div>
+</div>
+</form>
+</section>
+
+<section class="panel manage-section danger-zone" id="cleanup" aria-labelledby="cleanup-title">
+<div class="panel-head"><div><h2 id="cleanup-title">Удалить фотографии по сотруднику, роддому и дате</h2><p>Удалятся только фото, у которых совпадают сразу сотрудник, роддом и дата отправки (по Ташкенту). Профиль сотрудника останется. Восстановить фото будет нельзя.</p></div></div>
+<form method="post" action="{% url 'delete_filtered_photos' %}" onsubmit="return confirm('Удалить фотографии, совпадающие по выбранному сотруднику, роддому и дате отправки? Восстановить их будет невозможно.')">{% csrf_token %}
+<div class="form-grid">
+<label class="field"><span>Сотрудник</span><select name="telegram_id" required><option value="">Выберите…</option>{% for item in registered_users %}{% if item.photo_count %}<option value="{{ item.telegram_id }}">{{ item.full_name }} — {{ item.photo_count }} фото</option>{% endif %}{% endfor %}</select></label>
+<label class="field"><span>Роддом</span><select name="location" required><option value="">Выберите…</option>{% for location in photo_delete_locations %}<option value="{{ location.value }}">{{ location.city }} · {{ location.hospital }}</option>{% endfor %}</select></label>
+<label class="field"><span>Дата отправки</span><input type="date" name="sent_date" value="{{ today_date|date:'Y-m-d' }}" required></label>
+<div><button class="btn-danger">Удалить выбранные фото</button></div>
+</div>
+</form>
+</section>

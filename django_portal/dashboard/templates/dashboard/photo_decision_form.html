@@ -1,0 +1,11 @@
+<form class="decision-form" method="post" action="{% url 'set_photo_decision' photo.id %}">{% csrf_token %}
+<input type="hidden" name="next" value="{{ return_to|default:request.get_full_path }}">
+<span class="decision-form-title">Ручное решение оператора</span>
+<label class="sr-only" for="reason-{{ photo.id }}">Комментарий оператора</label>
+<input id="reason-{{ photo.id }}" name="reason" value="{{ photo.manual_reason|default:'' }}" maxlength="500" placeholder="Комментарий для медика">
+<div class="decision-actions">
+<button type="submit" class="accept{% if photo.manual_decision == 'accepted' %} is-selected{% endif %}" name="decision" value="accepted">✓ Принять</button>
+<button type="submit" class="reject{% if photo.manual_decision == 'rejected' %} is-selected{% endif %}" name="decision" value="rejected">✕ Отклонить</button>
+<button type="submit" class="review{% if photo.manual_decision == 'review' %} is-selected{% endif %}" name="decision" value="review">Вернуть «На проверку»</button>
+</div>
+</form>

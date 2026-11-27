@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse
+from django.shortcuts import render
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -26,6 +27,14 @@ from ..text import (
     excel_sheet_title,
     safe_excel_filename,
 )
+
+
+@login_required
+def reports_page(request):
+    """Все выгрузки Excel и статистика медиков на одной странице."""
+    from .photos import photo_list_context
+
+    return render(request, "dashboard/reports.html", photo_list_context(request))
 
 
 @login_required

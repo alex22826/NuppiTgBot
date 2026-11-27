@@ -1,1 +1,58 @@
-<article class="card {{ card_class }}"><a class="photo-viewer-link" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фото {{ photo.id }}" loading="lazy" decoding="async"></a><div><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span><b>Врач: {{ photo.doctor_name|default:'Не указан' }}</b><small><b>Отправитель: {{ photo.sender_name }}</b></small><small>Telegram ID отправителя: {{ photo.sender_telegram_id }}</small><small>{{ photo.city }} · {{ photo.maternity_hospital }}</small><small>Отправлено: {{ photo.sent_at_display }}</small><a class="button-link" href="{% url 'photo_image' photo.id %}?download=1">Скачать фото</a>{% include 'dashboard/photo_original_link.html' with photo=photo %}<small class="photo-code-status"><b>Проверка Data Matrix: <span>{{ photo.code_status }}</span></b></small><small class="photo-qr-data"><b>Номер QR/Data Matrix: <span>{{ photo.qr_data|default:'—' }}</span></b></small><small><b>Оценка ИИ: {{ photo.review_status }}</b></small><small>Причина: {{ photo.review_reason }}</small>{% if photo.ai_generated_percent is not None %}<small>Вероятность ИИ-генерации: {{ photo.ai_generated_percent|floatformat:1 }}%</small>{% endif %}<small class="photo-package-date">Дата на упаковке: <span>{{ photo.photo_date|default:'—' }}</span></small><small>Номер на упаковке: {{ photo.package_number|default:'—' }}</small><small class="photo-mother-name">Роженица: <span>{{ photo.mother_name|default:'—' }}</span></small><details class="check-details"><summary>Результаты всех проверок</summary><small>Товар: {{ photo.product_status }}</small><small>Материалы: {{ photo.material_status }}</small><small>Повтор: {{ photo.duplicate_status }}</small><small>Обработка: {{ photo.editing_status }}</small><small>Геолокация: {{ photo.location_status }}</small><small>Задание: {{ photo.assignment_status }}</small><small><b>Пояснение автоматической проверки: {{ photo.decision_reason }}</b></small></details><form class="decision-form" method="post" action="{% url 'set_photo_decision' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}"><strong class="decision-form-title">Ручное решение оператора</strong><small class="decision-form-hint">Только ручное решение оператора меняет итог; автоматическая проверка влияет на цвет и пояснение.</small>{% if photo.manual_decision %}<small class="manual-decision-current">Сейчас установлено оператором: {{ photo.manual_decision_label }}</small>{% endif %}<label>Комментарий оператора<input name="reason" value="{{ photo.manual_reason|default:'' }}" maxlength="500" placeholder="Для отклонения комментарий обязателен"></label><div class="decision-actions"><button type="submit" class="accept{% if photo.manual_decision == 'accepted' %} is-selected{% endif %}" name="decision" value="accepted">Принять</button><button type="submit" class="review{% if photo.manual_decision == 'review' %} is-selected{% endif %}" name="decision" value="review">На проверку</button><button type="submit" class="danger{% if photo.manual_decision == 'rejected' %} is-selected{% endif %}" name="decision" value="rejected">Отклонить</button></div></form><form class="photo-edit-form" method="post" action="{% url 'edit_photo_metadata' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}"><label>Дата на фото<input type="date" name="photo_date" value="{{ photo.photo_date|default:'' }}"></label><label>ФИО роженицы<input name="mother_name" value="{{ photo.mother_name|default:'' }}" maxlength="200"></label><label>QR/Data Matrix<input name="qr_data" value="{{ photo.qr_data|default:'' }}" maxlength="30" inputmode="numeric" placeholder="01-0000000123"></label><small>Дата и ФИО заполняются только оператором — ИИ их больше не считывает. Если QR не читается автоматически, впишите его вручную. Копией считается только совпадение QR либо одновременное совпадение ФИО и даты.</small><button type="submit">Сохранить дату, ФИО и QR</button></form><form method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить эту фотографию без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}"><button class="danger">Удалить фотографию</button></form></div></article>
+<article class="photo-card flag-{{ card_class|default:'clear' }}" data-photo-card>
+<div class="photo-thumb">
+<a class="photo-viewer-link" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фото {{ photo.id }}" loading="lazy" decoding="async"></a>
+<a class="photo-number" href="{% url 'photo_detail' photo.id %}" title="Открыть страницу фотографии">№{{ photo.id }}</a>
+<span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span>
+</div>
+<div class="photo-body">
+<div>
+<div class="photo-title">{{ photo.doctor_name|default:'Врач не указан' }}</div>
+<div class="photo-sub">{{ photo.city }} · {{ photo.maternity_hospital }}</div>
+</div>
+<ul class="photo-meta">
+<li>Медик: <b>{{ photo.sender_name }}</b></li>
+<li>Отправлено: {{ photo.sent_at_display }}</li>
+<li class="photo-qr-data">Номер QR/Data Matrix: <b><span>{{ photo.qr_data|default:'—' }}</span></b></li>
+</ul>
+<div class="flag"><div><b>{{ photo.review_status|default:'Не проверено' }}</b><br><span class="photo-code-status"><span>{{ photo.code_status|default:"Код: нет данных" }}</span></span></div></div>
+{% if photo.manual_reason %}<p class="operator-comment">{{ photo.manual_reason }}</p>{% endif %}
+{% include 'dashboard/photo_decision_form.html' with photo=photo %}
+<details class="more">
+<summary>Подробнее, правка и удаление</summary>
+<div class="more-body">
+<div class="more-block">
+<h4>Данные</h4>
+<dl class="facts">
+<dt>Telegram ID</dt><dd>{{ photo.sender_telegram_id }}</dd>
+<dt>Дата на упаковке</dt><dd class="photo-package-date"><span>{{ photo.photo_date|default:'—' }}</span></dd>
+<dt>Номер на упаковке</dt><dd>{{ photo.package_number|default:'—' }}</dd>
+<dt>Роженица</dt><dd class="photo-mother-name"><span>{{ photo.mother_name|default:'—' }}</span></dd>
+{% if photo.ai_generated_percent is not None %}<dt>Вероятность ИИ</dt><dd>{{ photo.ai_generated_percent|floatformat:1 }}%</dd>{% endif %}
+<dt>Причина</dt><dd>{{ photo.review_reason|default:'—' }}</dd>
+</dl>
+</div>
+<div class="more-block">
+<h4>Все автопроверки</h4>
+<dl class="facts">
+<dt>Товар</dt><dd>{{ photo.product_status }}</dd>
+<dt>Материалы</dt><dd>{{ photo.material_status }}</dd>
+<dt>Повтор</dt><dd>{{ photo.duplicate_status }}</dd>
+<dt>Обработка</dt><dd>{{ photo.editing_status }}</dd>
+<dt>Геолокация</dt><dd>{{ photo.location_status }}</dd>
+<dt>Задание</dt><dd>{{ photo.assignment_status }}</dd>
+<dt>Итог автоматики</dt><dd>{{ photo.decision_reason|default:'—' }}</dd>
+</dl>
+</div>
+<div class="more-block">
+<h4>Исправить данные</h4>
+{% include 'dashboard/photo_edit_form.html' with photo=photo %}
+</div>
+<div class="btn-row">
+<a class="btn btn-secondary btn-sm" href="{% url 'photo_image' photo.id %}?download=1">Скачать фото</a>
+{% include 'dashboard/photo_original_link.html' with photo=photo %}
+<form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to|default:request.get_full_path }}"><button class="btn-danger-outline btn-sm">Удалить фото</button></form>
+</div>
+</div>
+</details>
+</div>
+</article>

@@ -1,21 +1,55 @@
-{% load static %}
-<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Nuppi — {% if is_creator %}панель создателя{% else %}панель оператора{% endif %}{% endblock %}</title><link rel="stylesheet" href="{% static 'dashboard/style.css' %}?v=20261104-photo-number-search"><script src="{% static 'dashboard/photo_viewer.js' %}?v=20260908-pan" defer></script><script src="{% static 'dashboard/decision_controls.js' %}?v=20261016-edit-qr" defer></script></head>
-<body><header><a class="brand" href="{% url 'dashboard' %}">Nuppi · {% if is_creator %}панель создателя{% else %}панель оператора{% endif %}</a>{% if user.is_authenticated %}<a href="{% url 'logout' %}">Выйти</a>{% endif %}</header>
-<main>{% if messages %}{% for message in messages %}<p class="message {{ message.tags }}">{{ message }}</p>{% endfor %}{% endif %}{% block content %}{% endblock %}</main>
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Nuppi — фотоотчёты{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'dashboard/style.css' %}?v=20261127-redesign-2">
+<script src="{% static 'dashboard/photo_viewer.js' %}?v=20261127-redesign-2" defer></script>
+<script src="{% static 'dashboard/decision_controls.js' %}?v=20261127-redesign-2" defer></script>
+</head>
+<body>
+{% with section=request.resolver_match.url_name %}
+<header class="topbar">
+<div class="topbar-inner">
+<a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">N</span>Nuppi{% if user.is_authenticated %} <span class="brand-role">{% if is_creator %}создатель{% else %}оператор{% endif %}</span>{% endif %}</a>
+{% if user.is_authenticated %}
+<nav class="main-nav" aria-label="Разделы">
+<a href="{% url 'dashboard' %}"{% if section == 'dashboard' or section == 'photo_detail' or section == 'photo_original' or section == 'photo_lookup' %} aria-current="page"{% endif %}>Фотографии</a>
+<a href="{% url 'reports' %}"{% if section == 'reports' %} aria-current="page"{% endif %}>Отчёты</a>
+<a href="{% url 'chat_history' %}"{% if section == 'chat_history' %} aria-current="page"{% endif %}>Переписка</a>
+{% if is_creator %}<a href="{% url 'management' %}"{% if section == 'management' or section == 'edit_employee' %} aria-current="page"{% endif %}>Управление</a>{% endif %}
+</nav>
+<div class="topbar-tools">
+<form class="quick-find" method="get" action="{% url 'photo_lookup' %}" role="search">
+<label class="sr-only" for="quick-photo-number">Открыть фотографию по номеру</label>
+<input id="quick-photo-number" name="photo_id" type="number" min="1" step="1" inputmode="numeric" placeholder="№ фото" required>
+<button type="submit" class="btn-secondary" title="Открыть фотографию по номеру">Найти</button>
+</form>
+<span class="user-chip">{{ user.get_username }}</span>
+<a class="logout-link" href="{% url 'logout' %}">Выйти</a>
+</div>
+{% endif %}
+</div>
+</header>
+{% endwith %}
+<main class="page">
+{% if messages %}<div class="messages">{% for message in messages %}<p class="message {{ message.tags }}" role="status">{{ message }}</p>{% endfor %}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
 <dialog id="photo-viewer" class="photo-viewer-dialog" aria-labelledby="photo-viewer-title">
 <div class="photo-viewer-shell">
-<div class="photo-viewer-header"><strong id="photo-viewer-title">Просмотр фотографии</strong><button type="button" class="photo-viewer-close" data-photo-viewer-close aria-label="Закрыть просмотр">×</button></div>
+<div class="photo-viewer-header"><strong id="photo-viewer-title">Просмотр фотографии</strong><span class="photo-viewer-hint">Колесо мыши — увеличить, перетаскивание — сдвинуть</span><button type="button" class="photo-viewer-close" data-photo-viewer-close aria-label="Закрыть просмотр">×</button></div>
 <div class="photo-viewer-stage"><img id="photo-viewer-image" alt="Просматриваемая фотография"></div>
 <div class="photo-viewer-controls">
 <button type="button" data-photo-rotate="-90" aria-label="Повернуть фотографию налево">↶ Повернуть налево</button>
 <output id="photo-viewer-angle" aria-live="polite">0°</output>
 <button type="button" data-photo-rotate="90" aria-label="Повернуть фотографию направо">Повернуть направо ↷</button>
-<button type="button" class="secondary-control" data-photo-reset>Сбросить</button>
-<a id="photo-viewer-open" class="button-link secondary" href="#" target="_blank" rel="noopener">Открыть отдельно</a>
-<a id="photo-viewer-download" class="button-link" href="#">Скачать фото</a>
+<button type="button" data-photo-reset>Сбросить</button>
+<a id="photo-viewer-open" class="btn" href="#" target="_blank" rel="noopener">Открыть отдельно</a>
+<a id="photo-viewer-download" class="btn btn-primary" href="#">Скачать фото</a>
 </div>
 </div>
 </dialog>
-</body></html>
+</body>
+</html>

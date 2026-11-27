@@ -21,14 +21,14 @@
   }
 
   function updateCounter(decision, change) {
-    const count = document.querySelector(`.decision-card.${decision} b`);
+    const count = document.querySelector(`.status-tab.${decision} .count`);
     if (!count) return;
     const value = Number.parseInt(count.textContent, 10);
     if (Number.isFinite(value)) count.textContent = String(Math.max(0, value + change));
   }
 
   function updateCard(form, result) {
-    const card = form.closest(".card");
+    const card = form.closest("[data-photo-card]");
     const badge = card && card.querySelector(".decision-badge");
     if (badge) {
       badge.classList.remove(...decisions);
@@ -40,13 +40,6 @@
       button.classList.toggle("is-selected", button.value === result.decision);
     });
 
-    let current = form.querySelector(".manual-decision-current");
-    if (!current) {
-      current = document.createElement("small");
-      current.className = "manual-decision-current";
-      form.insertBefore(current, getStatus(form));
-    }
-    current.textContent = `Сейчас установлено оператором: ${result.decision_label}`;
 
     if (result.previous_decision !== result.decision) {
       updateCounter(result.previous_decision, -1);
@@ -73,7 +66,7 @@
   }
 
   function updateMetadataCard(form, result) {
-    const card = form.closest(".card");
+    const card = form.closest("[data-photo-card]");
     if (!card) return;
     const date = card.querySelector(".photo-package-date span");
     const mother = card.querySelector(".photo-mother-name span");
@@ -92,6 +85,13 @@
     event.preventDefault();
     const submitter = event.submitter;
     if (!submitter || !submitter.value) return;
+
+    const reason = form.querySelector('input[name="reason"]');
+    if (submitter.value === "rejected" && reason && !reason.value.trim()) {
+      setStatus(form, "Напишите причину отклонения — медик увидит её в боте.", "error");
+      reason.focus();
+      return;
+    }
 
     const buttons = [...form.querySelectorAll(".decision-actions button")];
     const data = new FormData(form);

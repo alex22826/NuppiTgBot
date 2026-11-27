@@ -1,7 +1,13 @@
-{% extends 'dashboard/base.html' %}{% block content %}
-<h1>Управление сайтом</h1>
-<p><a class="button-link secondary" href="{% url 'dashboard' %}">← Вернуться к фотографиям</a></p>
-{% if database_error %}<p class="error">{{ database_error }} Укажите BOT_DB_PATH в файле .env сайта.</p>{% else %}
+{% extends 'dashboard/base.html' %}
+{% block title %}Управление — Nuppi{% endblock %}
+{% block content %}
+<div class="page-head">
+<div>
+<h1>Управление</h1>
+<p>Сотрудники бота, роддома, задания для визитов и входы операторов на сайт.</p>
+</div>
+</div>
+{% if database_error %}<p class="error">{{ database_error }} Укажите BOT_DB_PATH в файле .env.</p>{% else %}
 {% include 'dashboard/management_sections.html' %}
 {% endif %}
 {% endblock %}

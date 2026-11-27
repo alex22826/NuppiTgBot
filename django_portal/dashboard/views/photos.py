@@ -64,13 +64,22 @@ PHOTO_PAGE_SIZE = 20
 
 @login_required
 def dashboard(request):
+    """Фотографии с вкладками по итогу проверки и фильтрами."""
+    return render(request, "dashboard/dashboard.html", photo_list_context(request))
+
+
+FILTER_PARAMETERS = ("city", "hospital", "doctor", "medic", "date_from", "date_to")
+
+
+def photo_list_context(request):
+    """Фильтры, счётчики и страница фото — общие для «Фотографий» и «Отчётов»."""
     creator_view = is_creator(request.user)
     connection = bot_database()
     if not connection:
-        return render(request, "dashboard/dashboard.html", {
+        return {
             "database_error": "Не найдена база medical_bot.db.",
             "is_creator": creator_view,
-        })
+        }
 
     city = request.GET.get("city", "")
     hospital = request.GET.get("hospital", "")
@@ -336,7 +345,7 @@ def dashboard(request):
     photo_page_start = photo_offset + 1 if summary["photo_count"] else 0
     photo_page_end = min(photo_offset + len(photos), summary["photo_count"])
 
-    return render(request, "dashboard/dashboard.html", {
+    return {
         "cities": cities, "hospitals": hospitals, "selected_city": city,
         "selected_hospital": hospital, "selected_date_from": selected_date_from,
         "selected_date_to": selected_date_to, "medics": medic_options,
@@ -362,9 +371,11 @@ def dashboard(request):
         "photo_page_start": photo_page_start,
         "photo_page_end": photo_page_end,
         "page_query": page_query,
+        "decision_total": sum(decision_counts.values()),
+        "has_filters": any(request.GET.get(name) for name in FILTER_PARAMETERS),
         "is_creator": creator_view,
         "return_to": request.get_full_path(),
-    })
+    }
 
 
 @login_required
@@ -416,6 +427,8 @@ def photo_detail(request, photo_id):
         raise Http404
     return render(request, "dashboard/photo_detail.html", {
         "photo": photo,
+        "review_group": photo_review_group(photo),
+        "return_to": request.get_full_path(),
         "is_creator": is_creator(request.user),
     })
 

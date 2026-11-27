@@ -1,3 +1,12 @@
-{% extends 'dashboard/base.html' %}{% block title %}Вход{% endblock %}{% block content %}
-<section class="login-card"><h1>Вход оператора</h1>{% if request.GET.csrf %}<p class="error">Страница входа устарела. Введите логин и пароль ещё раз.</p>{% endif %}<form method="post">{% csrf_token %}{{ form.as_p }}<button>Войти</button></form></section>
+{% extends 'dashboard/base.html' %}
+{% block title %}Вход — Nuppi{% endblock %}
+{% block content %}
+<div class="login-wrap">
+<section class="panel login-card">
+<h1 style="margin-bottom:6px">Вход в панель</h1>
+<p class="muted">Введите логин и пароль, которые выдал создатель сайта.</p>
+{% if request.GET.csrf %}<p class="error">Страница входа устарела. Введите логин и пароль ещё раз.</p>{% endif %}
+<form method="post">{% csrf_token %}{{ form.as_p }}<button>Войти</button></form>
+</section>
+</div>
 {% endblock %}

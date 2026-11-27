@@ -13,9 +13,13 @@ from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import reverse
 from openpyxl import load_workbook
 
+from .. import db as site_db
+from .. import photos as site_photos
+from .. import reports as site_reports
+from .. import text as site_text
 from .. import views
-from .. import db as site_db, photos as site_photos, reports as site_reports, text as site_text
 from ..views import photos as photo_views
+from ..views import reports as report_views
 
 
 class OriginalPhotoTests(SimpleTestCase):
@@ -180,6 +184,29 @@ class OriginalPhotoTests(SimpleTestCase):
 
         self.assertContains(response, reverse('chat_history'))
         self.assertNotContains(response, reverse('management'))
+
+    def test_dashboard_has_sections_status_tabs_and_filter_reset(self):
+        self.add_photo(1)
+        response, context = self.dashboard_at()
+        self.assertEqual(context['decision_total'], 1)
+        self.assertFalse(context['has_filters'])
+        self.assertContains(response, reverse('reports'))
+        self.assertContains(response, 'class="status-tab review')
+        self.assertNotContains(response, 'Сбросить фильтры')
+
+        response, context = self.dashboard_at(city='Ташкент')
+        self.assertTrue(context['has_filters'])
+        self.assertContains(response, 'Сбросить фильтры')
+
+    def test_reports_page_shows_medic_statistics(self):
+        self.add_photo(1, sent_at='2026-09-03T10:00:00+00:00')
+        response, context = self.reports_at(date_from='2026-09-01', date_to='2026-09-03')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(context['medic_stats']), 1)
+        self.assertContains(response, 'Статистика медиков')
+        self.assertContains(response, 'Medic A')
+        self.assertContains(response, 'action="/photos/export.xlsx"')
+        self.assertContains(response, 'name="date_from" value="2026-09-01"')
 
     def test_dashboard_has_photo_number_search(self):
         request = self.factory.get('/')
@@ -346,16 +373,24 @@ class OriginalPhotoTests(SimpleTestCase):
         response, context = self.dashboard_at()
         self.assertEqual(context['summary']['photo_count'], 0)
         self.assertEqual(context['scope_summary']['photo_count'], 0)
-        self.assertContains(response, '<div id="period-photo-counter"><b>0</b>')
-        self.assertContains(response, 'фотографий за выбранный период')
-        self.assertContains(response, '<small>Все даты</small>')
+        self.assertContains(response, 'id="period-photo-counter">Найдено <b>0</b> фото')
+        self.assertContains(response, 'Период: <b>Все даты</b>')
+        self.assertContains(response, f"Медиков: <b>{context['medic_total']['medic_count']}</b>")
+        self.assertContains(response, 'За всё время: <b>0</b>')
+        self.assertContains(response, 'Фотографий не найдено')
         self.assertNotContains(response, 'UTC+5')
-        html = response.content.decode()
-        self.assertLess(html.index('фотографий за всё время'), html.index('id="period-photo-counter"'))
-        self.assertLess(html.index('id="period-photo-counter"'), html.index('<span>медиков'))
+
+    def reports_at(self, now=None, **filters):
+        request = self.factory.get('/reports/', filters)
+        request.user = SimpleNamespace(is_authenticated=True, username='operator')
+        with override_settings(TIME_ZONE='Asia/Tashkent', USE_TZ=True), \
+             patch('django.utils.timezone.now', return_value=now or datetime(2026, 9, 3, 12, tzinfo=timezone.utc)), \
+             patch.object(report_views, 'render', wraps=report_views.render) as rendering:
+            response = views.reports_page(request)
+        return response, rendering.call_args.args[2]
 
     def test_full_report_form_defaults_to_last_ten_days(self):
-        response, context = self.dashboard_at()
+        response, context = self.reports_at()
         self.assertEqual(context['full_report_date_from'], '2026-08-25')
         self.assertEqual(context['full_report_date_to'], '2026-09-03')
         self.assertContains(response, 'action="/reports/full-last-10-days.xlsx"')
@@ -516,7 +551,7 @@ class OriginalPhotoTests(SimpleTestCase):
         response, context = self.dashboard_at(date_from='2026-09-03', date_to='2026-09-03')
         self.assertEqual(context['summary']['photo_count'], 3)
         self.assertEqual(context['scope_summary']['photo_count'], 5)
-        self.assertContains(response, '<small>03.09.2026</small>')
+        self.assertContains(response, 'Период: <b>03.09.2026</b>')
 
     def test_period_counter_follows_scope_and_date_filters(self):
         self.connection.executemany(
@@ -542,7 +577,7 @@ class OriginalPhotoTests(SimpleTestCase):
         self.assertEqual(context['scope_summary']['photo_count'], 2)
         self.assertEqual(context['summary']['photo_count'], 1)
         self.assertEqual([photo['id'] for photo in context['photos']], [5])
-        self.assertContains(response, '<small>01.08.2026 — 31.08.2026</small>')
+        self.assertContains(response, 'Период: <b>01.08.2026 — 31.08.2026</b>')
 
     def test_doctor_search_uses_photo_names_and_all_counters(self):
         self.connection.executemany(
@@ -787,7 +822,7 @@ class OriginalPhotoTests(SimpleTestCase):
         self.add_photo(2, sent_at='2026-09-03T10:00:00+00:00')
         response, context = self.dashboard_at(date_from='2026-09-02')
         self.assertEqual(context['summary']['photo_count'], 1)
-        self.assertContains(response, '<small>с 02.09.2026</small>')
+        self.assertContains(response, 'Период: <b>с 02.09.2026</b>')
 
     def test_photo_cards_show_short_local_time_and_keep_raw_timestamp(self):
         from django.template.loader import render_to_string
