@@ -1,0 +1,41 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Журнал действий — Nuppi{% endblock %}
+{% block crumbs %}<span>Журнал действий</span>{% endblock %}
+{% block content %}
+<div class="page-head">
+<div>
+<h1>Журнал действий</h1>
+<p>Кто, когда и что сделал на сайте: входы, решения по фото, правки, удаления, выгрузки и изменения сотрудников. Записи нельзя изменить или удалить с сайта.</p>
+</div>
+</div>
+
+<form class="panel filter-bar" method="get">
+{% if object_id %}<input type="hidden" name="object_type" value="{{ object_type }}"><input type="hidden" name="object_id" value="{{ object_id }}">{% endif %}
+<div class="filter-main journal-filters">
+<label class="field filter-search"><span>Поиск</span><span class="search-box"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><input type="search" name="q" value="{{ search_text }}" placeholder="Текст, логин или № фото"></span></label>
+<div class="field daterange" data-daterange data-autosubmit><span>Период</span><div class="daterange-inputs"><input type="date" name="date_from" value="{{ selected_date_from }}" aria-label="С даты"><input type="date" name="date_to" value="{{ selected_date_to }}" aria-label="По дату"></div></div>
+<label class="field"><span>Пользователь</span><select name="user" onchange="this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все</option>{% for name in usernames %}<option value="{{ name }}"{% if name == selected_user %} selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+<label class="field"><span>Что сделано</span><select name="group" onchange="this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все действия</option>{% for group in groups %}<option value="{{ group }}"{% if group == selected_group %} selected{% endif %}>{{ group }}</option>{% endfor %}</select></label>
+<div class="filter-buttons"><button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>Найти</button></div>
+</div>
+{% if has_filters %}<div class="chips">{% if object_id %}<span class="chip">Объект: {% if object_type == 'photo' %}фото №{% endif %}{{ object_id }}</span>{% endif %}<a class="chip chip-reset" href="{% url 'journal' %}">Сбросить все</a></div>{% endif %}
+</form>
+
+<div class="toolbar"><div class="toolbar-stats"><span class="stat">Найдено <b>{{ page.paginator.count }}</b> записей</span></div></div>
+
+{% if page.object_list %}
+<div class="table-wrap"><table class="journal-table">
+<thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Что именно</th><th class="hide-sm">IP</th></tr></thead>
+<tbody>{% for event in page.object_list %}<tr{% if event.dangerous %} class="row-danger"{% endif %}>
+<td class="nowrap"><b>{{ event.local_time|date:"d.m.Y" }}</b><small>{{ event.local_time|date:"H:i:s" }}</small></td>
+<td>{% if event.username %}<div class="person"><span class="avatar-sm" data-avatar="{{ event.username }}">{{ event.username|slice:":1"|upper }}</span><div><a class="link-quiet" href="?user={{ event.username|urlencode }}">{{ event.username }}</a>{% if event.role_label %}<small>{{ event.role_label }}</small>{% endif %}</div></div>{% else %}<span class="hint">—</span>{% endif %}</td>
+<td><span class="action-tag {{ event.action }}">{{ event.action_label }}</span></td>
+<td class="journal-summary">{% if event.object_type == 'photo' and event.object_id and event.action != 'photo_delete' %}<a class="link-quiet" href="{% url 'photo_detail' event.object_id %}">{{ event.summary }}</a>{% else %}{{ event.summary }}{% endif %}</td>
+<td class="hide-sm mono">{{ event.ip|default:"—" }}</td>
+</tr>{% endfor %}</tbody>
+</table></div>
+{% if page.has_other_pages %}<nav class="pagination" aria-label="Страницы журнала"><span>Страница {{ page.number }} из {{ page.paginator.num_pages }}</span><div class="btn-row">{% if page.has_previous %}<a class="btn btn-secondary btn-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page.previous_page_number }}">← Новее</a>{% endif %}{% if page.has_next %}<a class="btn btn-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page.next_page_number }}">Старше →</a>{% endif %}</div></nav>{% endif %}
+{% else %}
+<div class="empty"><div class="empty-icon"><svg class="icon"><use href="#i-journal"/></svg></div><b>Записей нет</b>{% if has_filters %}Попробуйте изменить фильтры.{% else %}Здесь появятся действия пользователей сайта.{% endif %}</div>
+{% endif %}
+{% endblock %}

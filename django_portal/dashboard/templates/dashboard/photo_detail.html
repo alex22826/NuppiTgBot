@@ -34,6 +34,11 @@
 {% if photo.ai_generated_percent is not None %}<dt>Вероятность ИИ</dt><dd>{{ photo.ai_generated_percent|floatformat:1 }}%</dd>{% endif %}
 </dl>
 </section>
+{% if history or photo.manual_reviewer %}<section class="panel">
+<div class="panel-head"><h2>История</h2>{% if 'audit.view' in nav.perms %}<a class="hint" href="{% url 'journal' %}?object_type=photo&amp;object_id={{ photo.id }}">Весь журнал →</a>{% endif %}</div>
+{% if history %}<ol class="timeline">{% for event in history %}<li class="timeline-item {{ event.action }}"><span class="timeline-dot"></span><div><b>{{ event.action_label }}</b> · {{ event.username|default:"система" }}<small>{{ event.created_at|date:"d.m.Y H:i" }}</small><p>{{ event.summary }}</p></div></li>{% endfor %}</ol>
+{% else %}<p class="hint">Проверил: <b>{{ photo.manual_reviewer }}</b> · {{ photo.manual_at_display }}. Подробная история ведётся с момента обновления сайта.</p>{% endif %}
+</section>{% endif %}
 <details class="panel collapsible">
 <summary><span class="summary-icon"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg></span>Исправить дату, ФИО или QR<span class="chev"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></span></summary>
 <div class="collapsible-body">{% include 'dashboard/photo_edit_form.html' with photo=photo %}</div>
@@ -41,7 +46,7 @@
 <div class="btn-row">
 <a class="btn btn-secondary" href="{% url 'photo_image' photo.id %}?download=1"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать фотографию</a>
 {% include 'dashboard/photo_original_link.html' with photo=photo %}
-<form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{% url 'dashboard' %}"><button class="btn-danger-outline"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить фото</button></form>
+{% if 'photos.delete' in nav.perms %}<form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{% url 'dashboard' %}"><button class="btn-danger-outline"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить фото</button></form>{% endif %}
 </div>
 </div>
 </div>

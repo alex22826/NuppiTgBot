@@ -4,17 +4,14 @@ import re
 from datetime import datetime
 from datetime import timezone as datetime_timezone
 
-from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from ..access import creator_required
+from .. import audit
+from ..access import creator_required, permission_required
 from ..catalog import load_hospital_renames, resolve_hospital_name
 from ..db import (
     bot_database,
@@ -153,6 +150,13 @@ def add_visit_assignment(request):
                 date_from or None, date_to or None, timezone.now().isoformat(),
             ),
         )
+    audit.record(
+        request, "assignment_add",
+        f"Задание: {city} · {hospital}" + (f", врач {doctor}" if doctor else "")
+        + (f", продукт {product}" if product else "") + (f", материал {material}" if material else ""),
+        object_type="assignment", city=city, hospital=hospital, doctor=doctor, product=product,
+        material=material, date_from=date_from or "", date_to=date_to or "", medic=medic,
+    )
     messages.success(request, "Задание добавлено. Оно применится к следующему подходящему визиту.")
     return redirect("management")
 
@@ -165,11 +169,19 @@ def delete_visit_assignment(request, assignment_id):
         raise Http404
     with connection:
         ensure_visit_assignments_table(connection)
+        assignment = connection.execute(
+            "SELECT city, maternity_hospital FROM visit_assignments WHERE id = ?", (assignment_id,),
+        ).fetchone()
         result = connection.execute(
             "DELETE FROM visit_assignments WHERE id = ?", (assignment_id,),
         )
     if not result.rowcount:
         raise Http404
+    audit.record(
+        request, "assignment_delete",
+        f"Удалено задание №{assignment_id}" + (f": {assignment['city']} · {assignment['maternity_hospital']}" if assignment else ""),
+        object_type="assignment", object_id=assignment_id,
+    )
     messages.success(request, "Задание удалено. Уже сохранённые результаты фотографий не изменены.")
     return redirect("management")
 
@@ -183,11 +195,18 @@ def disable_user(request, telegram_id):
         raise Http404
     with connection:
         ensure_active_column(connection)
+        employee = connection.execute(
+            "SELECT full_name FROM users WHERE telegram_id = ?", (telegram_id,),
+        ).fetchone()
         connection.execute("UPDATE users SET is_active = 0 WHERE telegram_id = ?", (telegram_id,))
+    if employee:
+        audit.record(request, "employee_disable", f"Отключён доступ к боту: {employee['full_name']}",
+                     object_type="employee", object_id=telegram_id)
     return redirect("dashboard")
 
 
 @creator_required
+@permission_required("photos.delete")
 @require_POST
 def delete_employee_photos(request, telegram_id):
     """Удаляет все фотографии выбранного медика, не удаляя его профиль."""
@@ -203,6 +222,11 @@ def delete_employee_photos(request, telegram_id):
         deleted_count = connection.execute(
             "DELETE FROM photos WHERE sender_telegram_id = ?", (telegram_id,),
         ).rowcount
+    audit.record(
+        request, "employee_photos_delete",
+        f"Удалены все фото сотрудника {employee['full_name']}: {deleted_count}",
+        object_type="employee", object_id=telegram_id, deleted=deleted_count,
+    )
     messages.success(
         request,
         f"У медика {employee['full_name']} удалено фотографий: {deleted_count}. Профиль медика сохранён.",
@@ -226,6 +250,8 @@ def delete_employee(request, telegram_id):
         connection.execute("DELETE FROM allowed_users WHERE telegram_id = ?", (telegram_id,))
         connection.execute("DELETE FROM employee_hospitals WHERE telegram_id = ?", (telegram_id,))
         connection.execute("DELETE FROM users WHERE telegram_id = ?", (telegram_id,))
+    audit.record(request, "employee_delete", f"Удалён сотрудник бота {employee['full_name']}",
+                 object_type="employee", object_id=telegram_id)
     messages.success(request, f"Сотрудник {employee['full_name']} полностью удалён. История фото сохранена.")
     return redirect("dashboard")
 
@@ -364,6 +390,12 @@ def rename_hospital(request):
             (city, old_name, new_name, datetime.now(datetime_timezone.utc).isoformat()),
         )
 
+    audit.record(
+        request, "hospital_rename",
+        f"Роддом «{old_name}» ({city}) → «{new_name}». Перенесено фото: {moved_photos}",
+        object_type="hospital", city=city, old_name=old_name, new_name=new_name,
+        moved_photos=moved_photos, updated_users=updated_users,
+    )
     messages.success(
         request,
         f"Роддом «{old_name}» переименован в «{new_name}». "
@@ -403,6 +435,8 @@ def add_employee(request):
             "INSERT OR REPLACE INTO allowed_users (telegram_id, added_by, added_at) VALUES (?, ?, datetime('now'))",
             (telegram_id, request.user.id),
         )
+    audit.record(request, "employee_add", f"Добавлен сотрудник бота {full_name} ({role}, {city})",
+                 object_type="employee", object_id=telegram_id, role=role, city=city, hospitals=hospitals)
     messages.success(request, f"Сотрудник добавлен. Telegram ID {telegram_id} получил доступ к боту.")
     return redirect("dashboard")
 
@@ -442,6 +476,14 @@ def edit_employee(request, telegram_id):
                 )
             else:
                 connection.execute("DELETE FROM allowed_users WHERE telegram_id = ?", (telegram_id,))
+            audit.record(
+                request, "employee_edit",
+                f"Изменён сотрудник бота {full_name}: {role}, {city}, доступ {'открыт' if active else 'закрыт'}",
+                object_type="employee", object_id=telegram_id,
+                before={"full_name": employee["full_name"], "role": employee["role"], "city": employee["city"],
+                        "is_active": employee["is_active"]},
+                after={"full_name": full_name, "role": role, "city": city, "is_active": active, "hospitals": hospitals},
+            )
             messages.success(request, "Данные сотрудника сохранены.")
             return redirect("dashboard")
         assigned_hospitals = [row["maternity_hospital"] for row in connection.execute(
@@ -451,30 +493,3 @@ def edit_employee(request, telegram_id):
         "employee": employee,
         "assigned_hospitals": ", ".join(assigned_hospitals) or employee["maternity_hospital"],
     })
-
-
-@creator_required
-@require_POST
-def add_site_operator(request):
-    """Создаёт обычный сайт-аккаунт без доступа к Django admin и данным сотрудников."""
-    username = request.POST.get("site_username", "").strip()
-    password = request.POST.get("site_password", "")
-    if len(username) < 3 or len(password) < 8:
-        messages.error(request, "Логин должен быть не короче 3 символов, пароль — не короче 8.")
-        return redirect("dashboard")
-    if username == settings.CREATOR_DJANGO_USERNAME:
-        messages.error(request, "Этот логин зарезервирован для создателя.")
-        return redirect("dashboard")
-    user_model = get_user_model()
-    if user_model.objects.filter(username=username).exists():
-        messages.error(request, "Такой логин сайта уже существует.")
-        return redirect("dashboard")
-    try:
-        # Те же правила, что и при createsuperuser: не слишком простой, не только цифры.
-        validate_password(password, user_model(username=username))
-    except ValidationError as error:
-        messages.error(request, "Пароль не подходит: " + " ".join(error.messages))
-        return redirect("dashboard")
-    user_model.objects.create_user(username=username, password=password, is_staff=False, is_superuser=False)
-    messages.success(request, f"Создан доступ оператора к сайту: {username}.")
-    return redirect("dashboard")

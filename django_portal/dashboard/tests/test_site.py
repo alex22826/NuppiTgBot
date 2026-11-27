@@ -23,6 +23,9 @@ from ..views import reports as report_views
 
 
 class OriginalPhotoTests(SimpleTestCase):
+    # Журнал и профили ролей хранятся в базе сайта.
+    databases = {"default"}
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -915,6 +918,9 @@ class OriginalPhotoTests(SimpleTestCase):
 
 @override_settings(TIME_ZONE='Asia/Tashkent')
 class SentAtFormattingTests(SimpleTestCase):
+    # Журнал и профили ролей хранятся в базе сайта.
+    databases = {"default"}
+
     def test_utc_and_local_offset_show_the_same_minute_without_seconds(self):
         for value in ('2026-09-03T11:56:47.536864+00:00', '2026-09-03T16:56:47.536864+05:00'):
             with self.subTest(value=value):

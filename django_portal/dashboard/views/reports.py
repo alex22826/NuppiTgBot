@@ -4,13 +4,14 @@ from datetime import datetime
 from io import BytesIO
 from urllib.parse import quote
 
-from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse
 from django.shortcuts import render
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.styles import Alignment, Font, PatternFill
 
+from .. import audit
+from ..access import permission_required, region_condition, user_regions
 from ..db import bot_database, database_table_exists, photo_columns
 from ..decision_rules import DECISION_ACCEPTED
 from ..periods import requested_period
@@ -29,7 +30,7 @@ from ..text import (
 )
 
 
-@login_required
+@permission_required("reports.view")
 def reports_page(request):
     """Все выгрузки Excel и статистика медиков на одной странице."""
     from ..periods import full_report_period
@@ -46,7 +47,7 @@ def reports_page(request):
     return render(request, "dashboard/reports.html", photo_list_context(request))
 
 
-@login_required
+@permission_required("reports.export")
 def export_full_ten_day_report(request):
     """Отдельный полный отчёт по всей базе за выбранные оператором даты."""
     connection = bot_database()
@@ -58,10 +59,13 @@ def export_full_ten_day_report(request):
             connection,
             date_from=selected_date_from,
             date_to=selected_date_to,
+            regions=user_regions(request.user),
         )
     output = build_full_ten_day_report(report_data)
     date_from = report_data["date_from"].strftime("%d.%m.%Y")
     date_to = report_data["date_to"].strftime("%d.%m.%Y")
+    audit.record(request, "export", f"Полный отчёт по принятым фото за {date_from} — {date_to}",
+                 object_type="report", object_id="full", date_from=date_from, date_to=date_to)
     filename = f"Полный_отчет_{date_from}-{date_to}.xlsx"
     response = HttpResponse(
         output.getvalue(),
@@ -73,7 +77,7 @@ def export_full_ten_day_report(request):
     return response
 
 
-@login_required
+@permission_required("reports.export")
 def export_rejected_photo_report(request):
     """Download rejected photos, operator comments and context for a date range."""
     connection = bot_database()
@@ -97,10 +101,14 @@ def export_rejected_photo_report(request):
             hospital=hospital,
             medic=selected_medic,
             doctor=selected_doctor,
+            regions=user_regions(request.user),
         )
     output = build_rejected_photo_report(report_data)
     date_from = report_data["date_from"].strftime("%d.%m.%Y")
     date_to = report_data["date_to"].strftime("%d.%m.%Y")
+    audit.record(request, "export", f"Отчёт по отклонённым фото за {date_from} — {date_to}",
+                 object_type="report", object_id="rejected", date_from=date_from, date_to=date_to,
+                 filters={key: value for key, value in request.GET.items() if value})
     filename = f"Отклоненные_фотографии_{date_from}-{date_to}.xlsx"
     response = HttpResponse(
         output.getvalue(),
@@ -112,7 +120,7 @@ def export_rejected_photo_report(request):
     return response
 
 
-@login_required
+@permission_required("reports.export")
 def export_photos(request):
     """Скачиваемая копия только фотографий, вручную принятых оператором."""
     connection = bot_database()
@@ -152,6 +160,10 @@ def export_photos(request):
         if city:
             conditions.append("sender.city = ?")
             parameters.append(city)
+        region_sql, region_params = region_condition(user_regions(request.user))
+        if region_sql:
+            conditions.append(region_sql)
+            parameters.extend(region_params)
         if hospital:
             conditions.append(f"{photo_hospital} = ?")
             parameters.append(hospital)
@@ -172,6 +184,9 @@ def export_photos(request):
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY DATE(p.sent_at), p.sent_at"
         records = connection.execute(query, parameters).fetchall()
+    audit.record(request, "export", f"Список принятых фото в Excel: {len(records)} записей",
+                 object_type="report", object_id="photos",
+                 filters={key: value for key, value in request.GET.items() if value})
 
     workbook = Workbook()
     doctor_groups = {}

@@ -137,7 +137,8 @@ def photo_details_for_operator(connection, photo_id):
     check = None
     if database_table_exists(connection, "photo_checks"):
         check = connection.execute(
-            """SELECT decision, decision_reason, manual_decision, manual_reason
+            """SELECT decision, decision_reason, manual_decision, manual_reason,
+                      manual_reviewer, manual_at
                FROM photo_checks WHERE photo_id = ?""",
             (photo_id,),
         ).fetchone()
@@ -151,6 +152,8 @@ def photo_details_for_operator(connection, photo_id):
     photo["decision_label"] = DECISION_LABELS.get(effective_decision, "На проверке")
     photo["manual_decision"] = manual_decision
     photo["manual_reason"] = (check["manual_reason"] or "") if check else ""
+    photo["manual_reviewer"] = (check["manual_reviewer"] or "") if check else ""
+    photo["manual_at_display"] = format_sent_at(check["manual_at"]) if check and check["manual_at"] else ""
     photo["decision_reason"] = (
         (check["manual_reason"] or check["decision_reason"] or "")
         if check else (photo.get("review_reason") or "")

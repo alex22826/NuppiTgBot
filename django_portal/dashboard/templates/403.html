@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Нет доступа — Nuppi{% endblock %}
+{% block crumbs %}<span>Нет доступа</span>{% endblock %}
+{% block content %}
+<div class="empty" style="margin-top:40px">
+<div class="empty-icon"><svg class="icon"><use href="#i-lock"/></svg></div>
+<b>У вашей роли нет доступа к этому разделу</b>
+{% if nav.role_label %}Ваша роль: {{ nav.role_label }}. {% endif %}Если доступ нужен для работы, попросите администратора изменить роль.
+<p style="margin-top:14px"><a class="btn btn-secondary" href="{% url 'dashboard' %}">На главную</a></p>
+</div>
+{% endblock %}
+{% block guest %}
+<section class="panel login-card"><h1>Нет доступа</h1><p class="muted">Войдите на сайт под своим логином.</p><a class="btn" href="{% url 'login' %}">Войти</a></section>
+{% endblock %}

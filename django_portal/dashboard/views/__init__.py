@@ -8,6 +8,7 @@ from .common import (  # noqa: F401
     logout_view,
     return_to_photo_list,
 )
+from .journal import journal  # noqa: F401
 from .photos import (  # noqa: F401
     dashboard,
     delete_filtered_photos,
@@ -27,7 +28,6 @@ from .reports import (  # noqa: F401
 )
 from .staff import (  # noqa: F401
     add_employee,
-    add_site_operator,
     add_visit_assignment,
     delete_employee,
     delete_employee_photos,
@@ -37,6 +37,7 @@ from .staff import (  # noqa: F401
     management,
     rename_hospital,
 )
+from .users import user_add, user_edit, users_list  # noqa: F401
 
 __all__ = [
     "csrf_failure",
@@ -61,9 +62,12 @@ __all__ = [
     "rename_hospital",
     "add_employee",
     "edit_employee",
-    "add_site_operator",
     "export_full_ten_day_report",
     "export_rejected_photo_report",
     "reports_page",
     "export_photos",
+    "journal",
+    "user_add",
+    "user_edit",
+    "users_list",
 ]
