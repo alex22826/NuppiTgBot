@@ -21,36 +21,49 @@
   }
 
   function updateCounter(decision, change) {
-    const count = document.querySelector(`.decision-card.${decision} b`);
+    const count = document.querySelector(`.status-tab.${decision} .count`);
     if (!count) return;
     const value = Number.parseInt(count.textContent, 10);
     if (Number.isFinite(value)) count.textContent = String(Math.max(0, value + change));
+    count.classList.remove("is-bumped");
+    void count.offsetWidth;
+    count.classList.add("is-bumped");
+  }
+
+  function updateSidebarBadge(change) {
+    const badge = document.querySelector(".side-badge");
+    if (!badge) return;
+    const value = Math.max(0, (Number.parseInt(badge.textContent, 10) || 0) + change);
+    badge.textContent = String(value);
+    badge.hidden = value === 0;
   }
 
   function updateCard(form, result) {
-    const card = form.closest(".card");
+    const card = form.closest("[data-photo-card]");
     const badge = card && card.querySelector(".decision-badge");
     if (badge) {
-      badge.classList.remove(...decisions);
+      badge.classList.remove(...decisions, "is-updated");
       badge.classList.add(result.decision);
       badge.textContent = result.decision_label;
+      void badge.offsetWidth;
+      badge.classList.add("is-updated");
+    }
+    if (card) {
+      card.classList.remove("is-saved");
+      void card.offsetWidth;
+      card.classList.add("is-saved");
     }
 
     form.querySelectorAll(".decision-actions button").forEach((button) => {
       button.classList.toggle("is-selected", button.value === result.decision);
     });
 
-    let current = form.querySelector(".manual-decision-current");
-    if (!current) {
-      current = document.createElement("small");
-      current.className = "manual-decision-current";
-      form.insertBefore(current, getStatus(form));
-    }
-    current.textContent = `Сейчас установлено оператором: ${result.decision_label}`;
 
     if (result.previous_decision !== result.decision) {
       updateCounter(result.previous_decision, -1);
       updateCounter(result.decision, 1);
+      const change = (result.decision === "review" ? 1 : 0) - (result.previous_decision === "review" ? 1 : 0);
+      if (change) updateSidebarBadge(change);
     }
   }
 
@@ -73,7 +86,7 @@
   }
 
   function updateMetadataCard(form, result) {
-    const card = form.closest(".card");
+    const card = form.closest("[data-photo-card]");
     if (!card) return;
     const date = card.querySelector(".photo-package-date span");
     const mother = card.querySelector(".photo-mother-name span");
@@ -92,6 +105,13 @@
     event.preventDefault();
     const submitter = event.submitter;
     if (!submitter || !submitter.value) return;
+
+    const reason = form.querySelector('input[name="reason"]');
+    if (submitter.value === "rejected" && reason && !reason.value.trim()) {
+      setStatus(form, "Напишите причину отклонения — медик увидит её в боте.", "error");
+      reason.focus();
+      return;
+    }
 
     const buttons = [...form.querySelectorAll(".decision-actions button")];
     const data = new FormData(form);
@@ -113,6 +133,8 @@
       if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить итог.");
       updateCard(form, result);
       setStatus(form, `Сохранено: ${result.decision_label}.`, "success");
+      const number = form.action.match(/photo\/(\d+)\//);
+      if (window.nuppiToast) window.nuppiToast(`Фото${number ? ` №${number[1]}` : ""}: ${result.decision_label}`);
     } catch (error) {
       setStatus(form, error.message || "Не удалось сохранить итог.", "error");
     } finally {
@@ -146,6 +168,7 @@
       }
       updateMetadataCard(form, result);
       setMetadataStatus(form, result.message || "Данные фотографии сохранены.", "success");
+      if (window.nuppiToast) window.nuppiToast(result.message || "Данные фотографии сохранены.");
     } catch (error) {
       setMetadataStatus(form, error.message || "Не удалось сохранить данные фотографии.", "error");
     } finally {

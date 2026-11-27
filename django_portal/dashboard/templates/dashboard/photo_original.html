@@ -1,21 +1,26 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Оригинал фотографии №{{ photo.id }} — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'dashboard' %}">Фотографии</a><a href="{% url 'photo_detail' photo.id %}">№{{ photo.id }}</a><span>Оригинал</span>{% endblock %}
 {% block content %}
-<h1>Оригинал для фотографии №{{ photo.id }}</h1>
-<p class="note">Показан снимок, с которым бот связал эту копию, из всех присланных фотографий — без ограничений по городу, медику и периоду. Совпадение по QR-коду или оценке ИИ требует проверки оператором.</p>
+<a class="back-link" href="{% url 'photo_detail' photo.id %}">← Фотография №{{ photo.id }}</a>
+<div class="page-head">
+<div>
+<h1>Сравнение с оригиналом</h1>
+<p>Слева — снимок, который бот посчитал оригиналом, справа — фото №{{ photo.id }}, помеченное как копия. Совпадение по коду или по оценке ИИ всегда проверяет оператор.</p>
+</div>
+</div>
 {% if not original %}
-<p class="error" role="status">Не удалось найти оригинал. Он мог быть удалён, либо в старой записи недостаточно данных для однозначной связи. Случайное похожее фото не подставляется.</p>
+<p class="error" role="status" style="margin-bottom:20px">Не удалось найти оригинал. Он мог быть удалён, либо в старой записи недостаточно данных для однозначной связи. Случайное похожее фото не подставляется.</p>
 {% endif %}
 <div class="photo-comparison">
 {% if original %}<section aria-labelledby="original-heading">
-<h2 id="original-heading">Оригинал №{{ original.id }}</h2>
+<div class="section-head"><h2 id="original-heading">Оригинал №{{ original.id }}</h2></div>
 {% include 'dashboard/photo_comparison_card.html' with item=original %}
 </section>{% endif %}
 <section aria-labelledby="copy-heading">
-<h2 id="copy-heading">Копия №{{ photo.id }}</h2>
+<div class="section-head"><h2 id="copy-heading">Копия №{{ photo.id }}</h2></div>
 {% include 'dashboard/photo_comparison_card.html' with item=photo %}
-<p class="note">Причина: {{ photo.review_reason|default:'Не указана' }}</p>
+<p class="hint" style="margin-top:10px">Причина: {{ photo.review_reason|default:'Не указана' }}</p>
 </section>
 </div>
-<p><a class="button-link secondary" href="{% url 'dashboard' %}">Все фотографии</a></p>
 {% endblock %}

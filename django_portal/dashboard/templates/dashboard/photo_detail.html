@@ -1,35 +1,48 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Фотография №{{ photo.id }} — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'dashboard' %}">Фотографии</a><span>№{{ photo.id }}</span>{% endblock %}
 {% block content %}
+<div class="page-head">
+<div>
 <h1>Фотография №{{ photo.id }}</h1>
-<div class="photo-detail-layout">
-<a class="photo-viewer-link photo-detail-image" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener">
-<img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фотография №{{ photo.id }}" decoding="async">
-</a>
-<section class="photo-detail-info" aria-labelledby="photo-details-heading">
-<h2 id="photo-details-heading">Данные фотографии</h2>
-<p><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span></p>
-<dl class="photo-detail-list">
+<p>{{ photo.doctor_name|default:'Врач не указан' }} · {{ photo.city }} · {{ photo.maternity_hospital }}</p>
+</div>
+</div>
+<div class="detail-layout">
+<div class="panel detail-image">
+<a class="photo-viewer-link" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фотография №{{ photo.id }}" decoding="async"></a>
+<p class="hint">Нажмите на фото, чтобы открыть его крупно, повернуть или увеличить.</p>
+</div>
+<div class="detail-side flag-{{ review_group|default:'clear' }}" data-photo-card>
+<section class="panel">
+<div class="panel-head"><h2>Итог проверки</h2><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span></div>
+<div class="flag" style="margin-bottom:14px"><div><b>{{ photo.review_status|default:'Не проверено' }}</b><br><span class="photo-code-status"><span>{{ photo.code_status|default:"Код: нет данных" }}</span></span>{% if photo.review_reason %}<br>{{ photo.review_reason }}{% endif %}</div></div>
+{% include 'dashboard/photo_decision_form.html' with photo=photo %}
+</section>
+<section class="panel">
+<div class="panel-head"><h2>Данные фотографии</h2></div>
+<dl class="facts">
 <dt>Номер</dt><dd>№{{ photo.id }}</dd>
 <dt>Врач</dt><dd>{{ photo.doctor_name|default:'Не указан' }}</dd>
-<dt>Отправитель</dt><dd>{{ photo.sender_name }}</dd>
-<dt>Telegram ID</dt><dd>{{ photo.sender_telegram_id }}</dd>
+<dt>Медик</dt><dd>{{ photo.sender_name }} <span class="muted">· ID {{ photo.sender_telegram_id }}</span></dd>
 <dt>Город и роддом</dt><dd>{{ photo.city }} · {{ photo.maternity_hospital }}</dd>
 <dt>Отправлено</dt><dd>{{ photo.sent_at_display }}</dd>
-<dt>QR/Data Matrix</dt><dd>{{ photo.qr_data|default:'—' }}</dd>
-<dt>Проверка кода</dt><dd>{{ photo.code_status|default:'Нет данных' }}</dd>
-<dt>Дата на упаковке</dt><dd>{{ photo.photo_date|default:'—' }}</dd>
+<dt>QR/Data Matrix</dt><dd class="photo-qr-data"><span>{{ photo.qr_data|default:'—' }}</span></dd>
+<dt>Дата на упаковке</dt><dd class="photo-package-date"><span>{{ photo.photo_date|default:'—' }}</span></dd>
 <dt>Номер на упаковке</dt><dd>{{ photo.package_number|default:'—' }}</dd>
-<dt>Роженица</dt><dd>{{ photo.mother_name|default:'—' }}</dd>
-<dt>Автопроверка</dt><dd>{{ photo.review_status|default:'Не проверено' }}</dd>
-{% if photo.review_reason %}<dt>Причина автопроверки</dt><dd>{{ photo.review_reason }}</dd>{% endif %}
-{% if photo.manual_reason %}<dt>Комментарий оператора</dt><dd>{{ photo.manual_reason }}</dd>{% endif %}
+<dt>Роженица</dt><dd class="photo-mother-name"><span>{{ photo.mother_name|default:'—' }}</span></dd>
+{% if photo.ai_generated_percent is not None %}<dt>Вероятность ИИ</dt><dd>{{ photo.ai_generated_percent|floatformat:1 }}%</dd>{% endif %}
 </dl>
-<div class="photo-detail-actions">
-<a class="button-link" href="{% url 'photo_image' photo.id %}?download=1">Скачать фотографию</a>
-{% include 'dashboard/photo_original_link.html' with photo=photo %}
-<a class="button-link secondary" href="{% url 'dashboard' %}">Вернуться ко всем фотографиям</a>
-</div>
 </section>
+<details class="panel more-panel">
+<summary class="btn btn-ghost" style="width:100%;justify-content:space-between">Исправить дату, ФИО или QR <span aria-hidden="true">▾</span></summary>
+<div style="margin-top:12px">{% include 'dashboard/photo_edit_form.html' with photo=photo %}</div>
+</details>
+<div class="btn-row">
+<a class="btn btn-secondary" href="{% url 'photo_image' photo.id %}?download=1">⬇ Скачать фотографию</a>
+{% include 'dashboard/photo_original_link.html' with photo=photo %}
+<form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{% url 'dashboard' %}"><button class="btn-danger-outline">Удалить фото</button></form>
+</div>
+</div>
 </div>
 {% endblock %}

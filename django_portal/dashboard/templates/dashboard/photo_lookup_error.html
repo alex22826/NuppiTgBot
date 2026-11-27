@@ -1,14 +1,17 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Поиск фотографии — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'dashboard' %}">Фотографии</a><span>Поиск</span>{% endblock %}
 {% block content %}
-<div class="lookup-error-card">
-<h1>Фотография не открыта</h1>
+<div class="login-wrap">
+<section class="panel login-card">
+<h1 style="margin-bottom:12px">Фотография не найдена</h1>
 <p class="error" role="alert">{{ lookup_error }}</p>
-<form class="photo-number-search" method="get" action="{% url 'photo_lookup' %}">
-<label for="photo-number"><strong>Номер фотографии</strong></label>
+<form method="get" action="{% url 'photo_lookup' %}">
+<label for="photo-number">Номер фотографии</label>
 <input id="photo-number" name="photo_id" type="number" min="1" step="1" inputmode="numeric" value="{{ requested_photo_id|default:'' }}" placeholder="Например, 8450" required autofocus>
 <button type="submit">Найти</button>
 </form>
-<p><a class="button-link secondary" href="{% url 'dashboard' %}">Вернуться ко всем фотографиям</a></p>
+<p style="margin-top:14px"><a href="{% url 'dashboard' %}">← Все фотографии</a></p>
+</section>
 </div>
 {% endblock %}

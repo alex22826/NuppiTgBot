@@ -1,0 +1,70 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Отчёты — Nuppi{% endblock %}
+{% block crumbs %}<span>Отчёты</span>{% endblock %}
+{% block content %}
+<div class="page-head">
+<div>
+<h1>Отчёты</h1>
+<p>Выберите нужный отчёт, укажите период и нажмите «Скачать». Файл Excel сохранится на компьютер.</p>
+</div>
+</div>
+{% if database_error %}<p class="error">{{ database_error }} Укажите BOT_DB_PATH в файле .env.</p>{% else %}
+<div class="report-grid">
+
+<section class="panel report-card accepted" aria-labelledby="report-full">
+<div class="icon" aria-hidden="true">✓</div>
+<div>
+<h2 id="report-full">Полный отчёт по принятым фото</h2>
+<p class="hint">Для оплаты и сдачи: только фото, которые оператор вручную отметил «Принято». По умолчанию — последние 10 дней.</p>
+</div>
+<form method="get" action="{% url 'export_full_ten_day_report' %}">
+<div class="form-grid">
+<label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ full_report_date_from }}" required></label>
+<label class="field"><span>По дату</span><input type="date" name="date_to" value="{{ full_report_date_to }}" required></label>
+</div>
+<div class="form-actions"><button class="btn-ok">⬇ Скачать полный Excel</button></div>
+</form>
+</section>
+
+<section class="panel report-card rejected" aria-labelledby="report-rejected">
+<div class="icon" aria-hidden="true">✕</div>
+<div>
+<h2 id="report-rejected">Отчёт по отклонённым фотографиям</h2>
+<p class="hint">Фото, которые оператор отклонил, вместе с самим снимком и комментарием.</p>
+</div>
+<form method="get" action="{% url 'export_rejected_photo_report' %}">
+<div class="form-grid">
+<label class="field"><span>Город</span><select name="city"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}"{% if item == selected_city %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label class="field"><span>Роддом</span><select name="hospital"><option value="">Все роддома</option>{% for item in report_hospital_options %}<option value="{{ item.maternity_hospital }}"{% if item.city == selected_city and item.maternity_hospital == selected_hospital %} selected{% endif %}>{{ item.city }} · {{ item.maternity_hospital }}</option>{% endfor %}</select></label>
+<label class="field"><span>Врач</span><select name="doctor"><option value="">Все врачи</option>{% for group in report_doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}"{% if doctor == selected_doctor %} selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
+<label class="field"><span>Медик</span><select name="medic"><option value="">Все медики</option>{% for medic in report_medics %}<option value="{{ medic.telegram_id }}"{% if medic.telegram_id == selected_medic_id %} selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label>
+<label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ full_report_date_from }}" required></label>
+<label class="field"><span>По дату</span><input type="date" name="date_to" value="{{ full_report_date_to }}" required></label>
+</div>
+<div class="form-actions"><button class="btn-danger">⬇ Скачать отклонённые фото</button></div>
+</form>
+</section>
+
+<section class="panel report-card" aria-labelledby="report-list">
+<div class="icon" aria-hidden="true">☰</div>
+<div>
+<h2 id="report-list">Список фото по фильтрам</h2>
+<p class="hint">Все фото с их статусом и данными — по тем же фильтрам, что на странице «Фотографии». Сейчас: {{ selected_period_label|lower }}, найдено {{ summary.photo_count }}.</p>
+</div>
+<form method="get" action="{% url 'export_photos' %}">
+{% for key, value in request.GET.items %}{% if key != 'page' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+<div class="form-actions"><button>⬇ Скачать Excel</button><a class="btn btn-ghost" href="{% url 'dashboard' %}{% if page_query %}?{{ page_query }}{% endif %}">Изменить фильтры</a></div>
+</form>
+</section>
+
+</div>
+
+<section class="section" aria-labelledby="medic-stats">
+<div class="section-head"><h2 id="medic-stats">Статистика медиков</h2><span class="count">{{ selected_period_label }}</span><p>Сколько фото прислал каждый медик и чем закончилась проверка. Фильтры берутся со страницы «Фотографии».</p></div>
+{% if medic_stats %}<div class="table-wrap"><table data-sortable>
+<thead><tr><th data-sort="text">Медик</th><th class="num" data-sort="num">Визиты</th><th class="num" data-sort="num">Фото</th><th class="num" data-sort="num">Принято</th><th class="num" data-sort="num">На проверке</th><th class="num" data-sort="num">Отклонено</th></tr></thead>
+<tbody>{% for medic in medic_stats %}<tr><td data-value="{{ medic.medic_name }}">{{ medic.medic_name }}<small>ID {{ medic.sender_telegram_id }}</small></td><td class="num">{{ medic.visit_count }}</td><td class="num">{{ medic.photo_count }}</td><td class="num">{{ medic.accepted_count }}</td><td class="num">{{ medic.review_count }}</td><td class="num">{{ medic.rejected_count }}</td></tr>{% endfor %}</tbody>
+</table></div>{% else %}<div class="empty"><b>Нет данных</b>За выбранный период медики не присылали фото.</div>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

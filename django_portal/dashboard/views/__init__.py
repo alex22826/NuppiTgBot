@@ -23,6 +23,7 @@ from .reports import (  # noqa: F401
     export_full_ten_day_report,
     export_photos,
     export_rejected_photo_report,
+    reports_page,
 )
 from .staff import (  # noqa: F401
     add_employee,
@@ -63,5 +64,6 @@ __all__ = [
     "add_site_operator",
     "export_full_ten_day_report",
     "export_rejected_photo_report",
+    "reports_page",
     "export_photos",
 ]

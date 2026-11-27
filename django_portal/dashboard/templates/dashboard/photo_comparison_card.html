@@ -1,15 +1,18 @@
-<article class="card comparison-card">
-<a class="photo-viewer-link" href="{% url 'photo_image' item.id %}" data-download-url="{% url 'photo_image' item.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' item.id %}?thumbnail=1" alt="Фотография №{{ item.id }} целиком" loading="lazy" decoding="async"></a>
+<article class="photo-card comparison-card">
+<div class="photo-thumb"><a class="photo-viewer-link" href="{% url 'photo_image' item.id %}" data-download-url="{% url 'photo_image' item.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' item.id %}?thumbnail=1" alt="Фотография №{{ item.id }} целиком" loading="lazy" decoding="async"></a></div>
+<div class="photo-body">
 <div>
-<b>Врач: {{ item.doctor_name|default:'Не указан' }}</b>
-<small>Отправитель: {{ item.sender_name }}</small>
-<small>Telegram ID: {{ item.sender_telegram_id }}</small>
-<small>{{ item.city }} · {{ item.maternity_hospital }}</small>
-<small>Отправлено: {{ item.sent_at_display }}</small>
-<small><b>Проверка Data Matrix: {{ item.code_status|default:'Не проверено' }}</b></small>
-{% if item.qr_data %}<small><b>Номер QR/Data Matrix: {{ item.qr_data }}</b></small>{% endif %}
-<small>Дата на упаковке: {{ item.photo_date|default:'—' }}</small>
-<small>Роженица: {{ item.mother_name|default:'—' }}</small>
-<a class="button-link" href="{% url 'photo_image' item.id %}?download=1">Скачать фото</a>
+<div class="photo-title">{{ item.doctor_name|default:'Врач не указан' }}</div>
+<div class="photo-sub">{{ item.city }} · {{ item.maternity_hospital }}</div>
+</div>
+<ul class="photo-meta">
+<li>Медик: <b>{{ item.sender_name }}</b> · ID {{ item.sender_telegram_id }}</li>
+<li>Отправлено: {{ item.sent_at_display }}</li>
+<li>Проверка кода: <b>{{ item.code_status|default:'Не проверено' }}</b></li>
+{% if item.qr_data %}<li>Номер QR/Data Matrix: <b>{{ item.qr_data }}</b></li>{% endif %}
+<li>Дата на упаковке: {{ item.photo_date|default:'—' }}</li>
+<li>Роженица: {{ item.mother_name|default:'—' }}</li>
+</ul>
+<div class="btn-row"><a class="btn btn-secondary btn-sm" href="{% url 'photo_detail' item.id %}">Открыть №{{ item.id }}</a><a class="btn btn-ghost btn-sm" href="{% url 'photo_image' item.id %}?download=1">⬇ Скачать</a></div>
 </div>
 </article>

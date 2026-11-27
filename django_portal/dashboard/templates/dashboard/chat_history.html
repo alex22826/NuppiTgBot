@@ -1,33 +1,49 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Переписка с пользователями — Nuppi{% endblock %}
+{% block crumbs %}<span>Переписка</span>{% endblock %}
 {% block content %}
-<p><a class="button-link secondary" href="{% url 'dashboard' %}">← К фотографиям</a></p>
+<div class="page-head">
+<div>
 <h1>Переписка с пользователями</h1>
-<p class="note">Журнал доступен создателю сайта и авторизованным операторам. Сохраняются новые сообщения после установки обновления.</p>
+<p>Что медики писали боту и что бот им отвечал. Журнал доступен создателю и авторизованным операторам, только для чтения.</p>
+</div>
+</div>
 {% if database_error %}<p class="error">{{ database_error }}</p>
-{% elif chat_unavailable %}<p class="note">Журнал ещё не создан. Он появится после перезапуска обновлённого бота.</p>
-{% elif not conversations %}<p class="note">Новых сообщений пока нет.</p>
+{% elif chat_unavailable %}<div class="empty"><b>Журнал ещё не создан</b>Он появится после перезапуска обновлённого бота.</div>
+{% elif not conversations %}<div class="empty"><b>Сообщений пока нет</b>Здесь появится переписка, как только кто-то напишет боту.</div>
 {% else %}
-<form class="filters chat-filters" method="get">
-<label>Пользователь
-<select name="telegram_id">
-{% for conversation in conversations %}<option value="{{ conversation.telegram_id }}"{% if conversation.telegram_id == selected_telegram_id %} selected{% endif %}>{{ conversation.full_name }} · {{ conversation.telegram_id }} ({{ conversation.message_count }})</option>{% endfor %}
-</select>
-</label>
-<label>Дата от<input type="date" name="date_from" value="{{ selected_date_from }}"></label>
-<label>Дата до<input type="date" name="date_to" value="{{ selected_date_to }}"></label>
-<button type="submit">Показать</button>
+<div class="chat-layout">
+<div class="panel chat-side">
+<label class="search-box"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Поиск по пользователям</span><input type="search" placeholder="Поиск по имени или ID" data-filter-list="#chat-list"></label>
+<nav class="chat-list" id="chat-list" aria-label="Пользователи">
+{% for conversation in conversations %}<a data-filter-item href="?telegram_id={{ conversation.telegram_id }}{% if selected_date_from %}&amp;date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&amp;date_to={{ selected_date_to }}{% endif %}"{% if conversation.telegram_id == selected_telegram_id %} aria-current="true"{% endif %}>
+<span class="name">{{ conversation.full_name }}</span><span class="badge">{{ conversation.message_count }}</span>
+<span class="sub">ID {{ conversation.telegram_id }}{% if conversation.username %} · @{{ conversation.username }}{% endif %}</span>
+</a>{% endfor %}
+<p class="hint filter-empty" hidden>Никого не найдено</p>
+</nav>
+</div>
+<div class="chat-main">
+<div class="chat-head">
+<div>{% if selected_conversation %}<h2>{{ selected_conversation.full_name }}</h2><p class="hint">Telegram ID: {{ selected_conversation.telegram_id }}{% if selected_conversation.username %} · @{{ selected_conversation.username }}{% endif %}</p>{% endif %}</div>
+<form method="get">
+<input type="hidden" name="telegram_id" value="{{ selected_telegram_id|default:'' }}">
+<label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ selected_date_from }}"></label>
+<label class="field"><span>По дату</span><input type="date" name="date_to" value="{{ selected_date_to }}"></label>
+<button type="submit" class="btn-secondary">Показать</button>
 </form>
-{% if selected_conversation %}<h2>{{ selected_conversation.full_name }}</h2><p class="note">Telegram ID: {{ selected_conversation.telegram_id }}{% if selected_conversation.username %} · @{{ selected_conversation.username }}{% endif %}</p>{% endif %}
+</div>
 <section class="chat-window" aria-label="История переписки">
 {% for item in chat_messages %}
 <article class="chat-bubble {{ item.direction }}">
 <small class="chat-meta">{% if item.direction == 'incoming' %}Пользователь{% else %}Бот{% endif %} · {{ item.type_label }} · {{ item.created_at_display }}</small>
-{% if item.photo_id %}<a class="chat-photo" href="{% url 'photo_image' item.photo_id %}" target="_blank" rel="noopener"><img src="{% url 'photo_image' item.photo_id %}?thumbnail=1" alt="Фотография из переписки" loading="lazy"></a>{% elif item.message_type == 'photo' %}<span class="chat-attachment">📷 Фотография</span>{% elif item.message_type == 'document' %}<span class="chat-attachment">📎 Файл</span>{% endif %}
+{% if item.photo_id %}<a class="chat-photo" href="{% url 'photo_detail' item.photo_id %}" title="Открыть фотографию №{{ item.photo_id }}"><img src="{% url 'photo_image' item.photo_id %}?thumbnail=1" alt="Фотография из переписки" loading="lazy"></a>{% elif item.message_type == 'photo' %}<span class="chat-attachment">📷 Фотография</span>{% elif item.message_type == 'document' %}<span class="chat-attachment">📎 Файл</span>{% endif %}
 {% if item.text %}<div class="chat-text">{{ item.text|linebreaksbr }}</div>{% endif %}
 </article>
-{% empty %}<p class="note">За выбранный период сообщений нет.</p>{% endfor %}
+{% empty %}<p class="hint">За выбранный период сообщений нет.</p>{% endfor %}
 </section>
-<p class="note">Показываются последние {{ chat_history_limit }} сообщений выбранной переписки.</p>
+<p class="hint">Показываются последние {{ chat_history_limit }} сообщений выбранной переписки.</p>
+</div>
+</div>
 {% endif %}
 {% endblock %}

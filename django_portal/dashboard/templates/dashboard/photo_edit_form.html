@@ -1,0 +1,8 @@
+<form class="photo-edit-form" method="post" action="{% url 'edit_photo_metadata' photo.id %}">{% csrf_token %}
+<input type="hidden" name="next" value="{{ return_to|default:request.get_full_path }}">
+<label class="field"><span>Дата на упаковке</span><input type="date" name="photo_date" value="{{ photo.photo_date|default:'' }}"></label>
+<label class="field"><span>ФИО роженицы</span><input name="mother_name" value="{{ photo.mother_name|default:'' }}" maxlength="200"></label>
+<label class="field"><span>QR / Data Matrix</span><input name="qr_data" value="{{ photo.qr_data|default:'' }}" maxlength="30" inputmode="numeric" placeholder="01-0000000123"></label>
+<small class="hint">Дату и ФИО вписывает оператор. Если код не распознался, впишите его вручную. Копией считается совпадение кода или одновременно ФИО и даты.</small>
+<button type="submit" class="btn-secondary">Сохранить дату, ФИО и QR</button>
+</form>

@@ -1,12 +1,18 @@
-{% extends 'dashboard/base.html' %}{% block content %}
-<h1>Изменить сотрудника</h1>
-<form class="employee-form edit-form" method="post">{% csrf_token %}
-<label>Telegram ID<input name="telegram_id" value="{{ employee.telegram_id }}" readonly></label>
-<label>ФИО<input name="full_name" value="{{ employee.full_name }}" required></label>
-<label>Username<input name="username" value="{{ employee.username|default:'' }}"></label>
-<label>Город<input name="city" value="{{ employee.city }}" required></label>
-<label>Роддома через запятую<input name="maternity_hospital" value="{{ assigned_hospitals }}" required></label>
-<label>Роль<select name="role"><option {% if employee.role == 'Медик' %}selected{% endif %}>Медик</option><option {% if employee.role == 'Оператор' %}selected{% endif %}>Оператор</option></select></label>
-<label class="checkbox"><input type="checkbox" name="is_active" {% if employee.is_active %}checked{% endif %}> Доступ к боту разрешён</label>
-<button>Сохранить изменения</button><a class="button-link secondary" href="{% url 'dashboard' %}">Отмена</a>
-</form>{% endblock %}
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ employee.full_name }} — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'management' %}">Управление</a><a href="{% url 'management' %}#employees">Сотрудники</a><span>{{ employee.full_name }}</span>{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ employee.full_name }}</h1><p>Изменения сразу применяются в боте.</p></div></div>
+<form class="panel" method="post" style="max-width:760px">{% csrf_token %}
+<div class="form-grid">
+<label class="field"><span>Telegram ID</span><input name="telegram_id" value="{{ employee.telegram_id }}" readonly></label>
+<label class="field"><span>ФИО</span><input name="full_name" value="{{ employee.full_name }}" required></label>
+<label class="field"><span>Username</span><input name="username" value="{{ employee.username|default:'' }}" placeholder="без @"></label>
+<label class="field"><span>Роль</span><select name="role"><option{% if employee.role == 'Медик' %} selected{% endif %}>Медик</option><option{% if employee.role == 'Оператор' %} selected{% endif %}>Оператор</option></select></label>
+<label class="field"><span>Город</span><input name="city" value="{{ employee.city }}" required></label>
+<label class="field span-2"><span>Роддома через запятую</span><input name="maternity_hospital" value="{{ assigned_hospitals }}" required></label>
+<label class="field-check full"><input type="checkbox" name="is_active"{% if employee.is_active %} checked{% endif %}> Доступ к боту разрешён</label>
+</div>
+<div class="form-actions"><button>Сохранить</button><a class="btn btn-ghost" href="{% url 'management' %}#employees">Отмена</a></div>
+</form>
+{% endblock %}

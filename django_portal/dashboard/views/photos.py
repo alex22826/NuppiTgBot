@@ -64,13 +64,54 @@ PHOTO_PAGE_SIZE = 20
 
 @login_required
 def dashboard(request):
+    """Фотографии с вкладками по итогу проверки и фильтрами."""
+    return render(request, "dashboard/dashboard.html", photo_list_context(request))
+
+
+FILTER_PARAMETERS = ("city", "hospital", "doctor", "medic", "date_from", "date_to")
+
+# Сортировка списка: ключ из адреса → (подпись, ORDER BY). Только из этого списка,
+# поэтому значение из запроса никогда не попадает в SQL напрямую.
+PHOTO_SORTS = {
+    "new": ("Сначала новые", "p.sent_at DESC, p.id DESC"),
+    "old": ("Сначала старые", "p.sent_at ASC, p.id ASC"),
+    "doctor": ("По врачу (А–Я)", "doctor_name COLLATE NOCASE, p.sent_at DESC"),
+    "medic": ("По медику (А–Я)", "sender_name COLLATE NOCASE, p.sent_at DESC"),
+    "hospital": ("По роддому (А–Я)", "city COLLATE NOCASE, maternity_hospital COLLATE NOCASE, p.sent_at DESC"),
+    "number": ("По номеру фото", "p.id DESC"),
+}
+DEFAULT_PHOTO_SORT = "new"
+
+
+def active_filter_chips(request, labels):
+    """Метки выбранных фильтров; у каждой — ссылка, которая убирает только её."""
+    chips = []
+    for name in FILTER_PARAMETERS:
+        value = request.GET.get(name, "").strip()
+        if not value:
+            continue
+        query = request.GET.copy()
+        query.pop(name, None)
+        query.pop("page", None)
+        if name == "city":
+            query.pop("hospital", None)
+            query.pop("doctor", None)
+        title, shown = labels.get(name, (name, value))
+        if not shown:
+            continue
+        chips.append({"title": title, "value": shown, "remove_query": query.urlencode()})
+    return chips
+
+
+def photo_list_context(request):
+    """Фильтры, счётчики и страница фото — общие для «Фотографий» и «Отчётов»."""
     creator_view = is_creator(request.user)
     connection = bot_database()
     if not connection:
-        return render(request, "dashboard/dashboard.html", {
+        return {
             "database_error": "Не найдена база medical_bot.db.",
             "is_creator": creator_view,
-        })
+        }
 
     city = request.GET.get("city", "")
     hospital = request.GET.get("hospital", "")
@@ -85,6 +126,10 @@ def dashboard(request):
         selected_decision = ""
     selected_date_from, selected_date_to = requested_period(request)
     _, full_report_date_from, full_report_date_to = full_report_period()
+    selected_sort = request.GET.get("sort", DEFAULT_PHOTO_SORT).strip()
+    if selected_sort not in PHOTO_SORTS:
+        selected_sort = DEFAULT_PHOTO_SORT
+    group_by_flag = request.GET.get("group", "flag") != "none"
     requested_page = request.GET.get("page", "1").strip()
     photo_page = int(requested_page) if requested_page.isdigit() else 1
     photo_page = max(photo_page, 1)
@@ -311,7 +356,7 @@ def dashboard(request):
         ).fetchone()
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY p.sent_at DESC LIMIT ? OFFSET ?"
+        query += f" ORDER BY {PHOTO_SORTS[selected_sort][1]} LIMIT ? OFFSET ?"
         photos = [dict(row) for row in connection.execute(
             query,
             [*parameters, PHOTO_PAGE_SIZE, photo_offset],
@@ -324,7 +369,21 @@ def dashboard(request):
         photo["is_copy"] = is_copy_or_crop_status(photo["review_status"])
         photo["decision_label"] = DECISION_LABELS.get(photo["decision"], "На проверке")
         photo["manual_decision_label"] = DECISION_LABELS.get(photo["manual_decision"], "")
-        photo_groups[photo_review_group(photo)].append(photo)
+        photo["review_group"] = photo_review_group(photo)
+        photo_groups[photo["review_group"]].append(photo)
+
+    medic_names = {str(row["telegram_id"]): row["full_name"] for row in medic_options}
+    filter_chips = active_filter_chips(request, {
+        "city": ("Город", city),
+        "hospital": ("Роддом", hospital),
+        "doctor": ("Врач", selected_doctor),
+        "medic": ("Медик", medic_names.get(selected_medic, selected_medic)),
+        "date_from": ("С", format_selected_period(selected_date_from, selected_date_from) if selected_date_from else ""),
+        "date_to": ("По", format_selected_period(selected_date_to, selected_date_to) if selected_date_to else ""),
+    })
+    view_query = request.GET.copy()
+    for name in ("page", "sort", "group"):
+        view_query.pop(name, None)
 
     page_query = request.GET.copy()
     page_query.pop("page", None)
@@ -336,7 +395,7 @@ def dashboard(request):
     photo_page_start = photo_offset + 1 if summary["photo_count"] else 0
     photo_page_end = min(photo_offset + len(photos), summary["photo_count"])
 
-    return render(request, "dashboard/dashboard.html", {
+    return {
         "cities": cities, "hospitals": hospitals, "selected_city": city,
         "selected_hospital": hospital, "selected_date_from": selected_date_from,
         "selected_date_to": selected_date_to, "medics": medic_options,
@@ -362,9 +421,16 @@ def dashboard(request):
         "photo_page_start": photo_page_start,
         "photo_page_end": photo_page_end,
         "page_query": page_query,
+        "decision_total": sum(decision_counts.values()),
+        "photo_sorts": {key: label for key, (label, _order) in PHOTO_SORTS.items()},
+        "selected_sort": selected_sort,
+        "group_by_flag": group_by_flag,
+        "filter_chips": filter_chips,
+        "view_query": view_query.urlencode(),
+        "has_filters": any(request.GET.get(name) for name in FILTER_PARAMETERS),
         "is_creator": creator_view,
         "return_to": request.get_full_path(),
-    })
+    }
 
 
 @login_required
@@ -416,6 +482,8 @@ def photo_detail(request, photo_id):
         raise Http404
     return render(request, "dashboard/photo_detail.html", {
         "photo": photo,
+        "review_group": photo_review_group(photo),
+        "return_to": request.get_full_path(),
         "is_creator": is_creator(request.user),
     })
 

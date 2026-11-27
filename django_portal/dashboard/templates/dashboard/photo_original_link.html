@@ -1,3 +1,1 @@
-{% if photo.is_copy %}
-<a class="button-link" href="{% url 'photo_original' photo.id %}" target="_blank" rel="noopener">Показать оригинал</a>
-{% endif %}
+{% if photo.is_copy %}<a class="btn btn-secondary btn-sm" href="{% url 'photo_original' photo.id %}" target="_blank" rel="noopener">Показать оригинал</a>{% endif %}

@@ -63,7 +63,8 @@ DEMO_BANNER = (
 # Перехватываем отправку форм раньше скриптов сайта; выгрузки Excel оставляем рабочими.
 DEMO_SCRIPT = (
     "<script>window.addEventListener('submit',function(e){"
-    "if(/\\.xlsx$/.test(e.target.getAttribute('action')||''))return;"
+    "var t=(e.submitter&&e.submitter.getAttribute('formaction'))||e.target.getAttribute('action')||'';"
+    "if(/\\.xlsx$/.test(t))return;"
     "e.preventDefault();e.stopImmediatePropagation();"
     "alert('Это демо-версия: действия отключены.');},true);</script>"
 )
@@ -191,7 +192,12 @@ class SiteSnapshot:
 
     def __init__(self, client, photo_ids: list[int]):
         self.client = client
-        self.pages = {"/": "index.html", "/management/": "management.html", "/chats/": "chats.html"}
+        self.pages = {
+            "/": "index.html",
+            "/reports/": "reports.html",
+            "/management/": "management.html",
+            "/chats/": "chats.html",
+        }
         self.filters = {value: f"index-{value}.html" for value in ("review", "accepted", "rejected")}
         self.paged = {}
         for number in range(2, 50):
@@ -223,6 +229,11 @@ class SiteSnapshot:
         return "../" * page.count("/") + target
 
     def static_target(self, url: str) -> str:
+        url, hash_mark, fragment = url.partition("#")
+        target = self._static_target(url)
+        return f"{target}#{fragment}" if hash_mark and target != "#" else target
+
+    def _static_target(self, url: str) -> str:
         path, _, query = url.partition("?")
         if path in ("", "/"):
             page_match = re.fullmatch(r"page=(\d+)", query)
@@ -250,7 +261,7 @@ class SiteSnapshot:
                 target = self.relative(target, page)
             return f'{match.group(1)}="{target}"'
 
-        html = re.sub(r'(href|src|action|data-[a-z-]+)="([/?][^"]*)"', replace, html)
+        html = re.sub(r'(href|src|action|formaction|data-[a-z-]+)="([/?][^"]*)"', replace, html)
         html = re.sub(r"<body([^>]*)>", lambda m: f"<body{m.group(1)}>{DEMO_BANNER}", html, count=1)
         html = html.replace("</body>", f"{DEMO_SCRIPT}</body>")
         return re.sub(r'<input type="hidden" name="csrfmiddlewaretoken"[^>]*>', "", html)
