@@ -1,0 +1,47 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Сравнение №{{ photo.id }} и №{{ other.id }} — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'dashboard' %}">Фотографии</a><a href="{% url 'photo_detail' photo.id %}">№{{ photo.id }}</a><span>Сравнение с №{{ other.id }}</span>{% endblock %}
+{% block content %}
+<div class="page-head">
+<div>
+<h1>Сравнение фото №{{ photo.id }} и №{{ other.id }}</h1>
+<p>Почему система считает их связанными: {% for reason in match.reasons %}<span class="reason-tag {{ reason.code }}">{{ reason.label }}{% if reason.detail %}: {{ reason.detail }}{% endif %}</span>{% endfor %}</p>
+</div>
+<a class="btn btn-secondary" href="{% url 'photo_detail' photo.id %}">← К фото №{{ photo.id }}</a>
+</div>
+
+<div class="compare-grid">
+<section class="panel compare-col" data-photo-card data-photo-id="{{ photo.id }}">
+<div class="compare-head"><h2>№{{ photo.id }} <small>проверяемое</small></h2><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span></div>
+<a class="photo-viewer-link compare-image" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?preview=1" alt="Фото №{{ photo.id }}"></a>
+</section>
+<section class="panel compare-col">
+<div class="compare-head"><h2>№{{ other.id }} <small>{% if match.earlier %}отправлено раньше{% else %}отправлено позже{% endif %}</small></h2><span class="decision-badge {{ other.decision }}">{{ other.decision_label }}</span></div>
+<a class="photo-viewer-link compare-image" href="{% url 'photo_image' other.id %}" data-download-url="{% url 'photo_image' other.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' other.id %}?preview=1" alt="Фото №{{ other.id }}"></a>
+</section>
+</div>
+
+<section class="panel" style="margin-top:16px">
+<div class="panel-head"><h2>Данные рядом</h2><span class="hint">совпадающие значения подсвечены</span></div>
+<div class="table-wrap"><table class="compare-table">
+<thead><tr><th></th><th>№{{ photo.id }}</th><th>№{{ other.id }}</th></tr></thead>
+<tbody>
+<tr><td class="muted">Отправитель</td><td>{{ photo.sender_name }}</td><td>{{ other.sender_name }}</td></tr>
+<tr><td class="muted">Дата отправки</td><td>{{ photo.sent_at_display }}</td><td>{{ other.sent_at_display }}</td></tr>
+<tr><td class="muted">Регион и роддом</td><td>{{ photo.city }} · {{ photo.maternity_hospital }}</td><td>{{ other.city }} · {{ other.maternity_hospital }}</td></tr>
+<tr><td class="muted">Врач</td><td>{{ photo.doctor_name|default:'—' }}</td><td>{{ other.doctor_name|default:'—' }}</td></tr>
+<tr{% if photo.qr_data and photo.qr_data == other.qr_data %} class="same"{% endif %}><td class="muted">Код на упаковке</td><td>{{ photo.qr_data|default:'—' }}</td><td>{{ other.qr_data|default:'—' }}</td></tr>
+<tr{% if photo.mother_name and photo.mother_name == other.mother_name %} class="same"{% endif %}><td class="muted">ФИО</td><td>{{ photo.mother_name|default:'—' }}</td><td>{{ other.mother_name|default:'—' }}</td></tr>
+<tr{% if photo.photo_date and photo.photo_date == other.photo_date %} class="same"{% endif %}><td class="muted">Дата на упаковке</td><td>{{ photo.photo_date|default:'—' }}</td><td>{{ other.photo_date|default:'—' }}</td></tr>
+<tr><td class="muted">Автопроверка</td><td>{{ photo.review_status|default:'—' }}</td><td>{{ other.review_status|default:'—' }}</td></tr>
+<tr><td class="muted">Проверил</td><td>{{ photo.manual_reviewer|default:'—' }}{% if photo.manual_at_display %} · {{ photo.manual_at_display }}{% endif %}</td><td>{{ other.manual_reviewer|default:'—' }}{% if other.manual_at_display %} · {{ other.manual_at_display }}{% endif %}</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<section class="panel" style="margin-top:16px" data-photo-card data-photo-id="{{ photo.id }}">
+<div class="panel-head"><h2>Решение по фото №{{ photo.id }}</h2><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span></div>
+{% include 'dashboard/photo_decision_form.html' with photo=photo %}
+<p class="hint" style="margin-top:8px"><a href="{% url 'photo_detail' other.id %}">Открыть фото №{{ other.id }} целиком →</a></p>
+</section>
+{% endblock %}

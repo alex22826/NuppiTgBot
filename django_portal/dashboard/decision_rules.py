@@ -173,3 +173,16 @@ def legacy_automatic_photo_decision(
 def effective_decision(automatic_decision, manual_decision=None):
     manual = str(manual_decision or "").strip().casefold()
     return manual if manual in DECISION_LABELS else automatic_decision
+
+
+# Частые причины отклонения: оператор выбирает одну кнопкой и при
+# необходимости дописывает. Медик видит причину в боте.
+REJECTION_REASONS = [
+    "Не видно код на упаковке",
+    "Не читаются ФИО или дата",
+    "Повторное фото уже принятой упаковки",
+    "Не та продукция или не NUPPI 1",
+    "Фото размыто или слишком тёмное",
+    "Признаки монтажа или правки",
+    "Фото с экрана, а не с упаковки",
+]

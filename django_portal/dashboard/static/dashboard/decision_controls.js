@@ -143,8 +143,24 @@
       if (mother) mother.textContent = result.mother_name || "—";
       if (qr) qr.textContent = result.qr_data || "—";
       if (codeStatus) codeStatus.textContent = result.code_status || "—";
+      const brand = target.querySelector(".photo-package-brand span");
+      const formula = target.querySelector(".photo-package-formula span");
+      if (brand && result.package_brand !== undefined) brand.textContent = result.package_brand || "—";
+      if (formula && result.package_formula !== undefined) formula.textContent = result.package_formula || "—";
     });
   }
+
+  // Готовая причина отклонения подставляется в комментарий одним нажатием.
+  document.addEventListener("click", (event) => {
+    const chip = event.target.closest(".reason-chip");
+    if (!chip) return;
+    const form = chip.closest(".decision-form");
+    const input = form && form.querySelector('input[name="reason"]');
+    if (!input) return;
+    input.value = chip.dataset.reason;
+    input.focus();
+    form.querySelectorAll(".reason-chip").forEach((other) => other.classList.toggle("is-picked", other === chip));
+  });
 
   document.addEventListener("submit", async (event) => {
     const form = event.target.closest(".decision-form");
@@ -203,6 +219,8 @@
           photo_date: form.elements.photo_date.value,
           mother_name: form.elements.mother_name.value.trim(),
           qr_data: form.elements.qr_data.value.trim(),
+          package_brand: form.elements.package_brand ? form.elements.package_brand.value.trim().toUpperCase() : undefined,
+          package_formula: form.elements.package_formula ? form.elements.package_formula.value : undefined,
           code_status: code ? code.textContent : "",
           message: "Данные фотографии сохранены.",
         };

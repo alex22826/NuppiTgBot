@@ -20,4 +20,4 @@ jobs:
           PYTHONPATH: ..
         # Тесты бота (dashboard.tests.test_bot) отстают от кода и будут
         # включены здесь после их исправления.
-        run: python manage.py test dashboard.tests.test_site dashboard.tests.test_visit_system dashboard.tests.test_roles
+        run: python manage.py test dashboard.tests.test_site dashboard.tests.test_visit_system dashboard.tests.test_roles dashboard.tests.test_photo_card

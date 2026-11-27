@@ -17,22 +17,31 @@ PHOTO_THUMBNAIL_SIZE = (480, 480)
 
 PHOTO_THUMBNAIL_QUALITY = 72
 
+# Рабочая копия для карточки: заметно легче оригинала, но данные на упаковке
+# (ФИО, дата, код) на ней ещё читаются (ТЗ, п. 8.1).
+PHOTO_PREVIEW_SIZE = (1600, 1600)
+PHOTO_PREVIEW_QUALITY = 85
 
-def photo_thumbnail_cache_path(photo_id, image_digest):
+# Марки и номера смеси для поля «Данные с упаковки».
+PACKAGE_BRANDS = ["NUPPI", "NUPPI GOLD", "NUPPI F"]
+PACKAGE_FORMULAS = ["1", "2", "3", "4"]
+
+
+def photo_thumbnail_cache_path(photo_id, image_digest, suffix=""):
     """Хранит восстанавливаемые превью вне постоянного диска с основной БД."""
     cache_directory = settings.PHOTO_THUMBNAIL_CACHE_DIR
     safe_digest = re.sub(r"[^a-zA-Z0-9_-]", "", image_digest or "")[:32] or "unknown"
-    return cache_directory / f"{photo_id}-{safe_digest}.jpg"
+    return cache_directory / f"{photo_id}-{safe_digest}{suffix}.jpg"
 
 
-def make_photo_thumbnail(image_bytes):
+def make_photo_thumbnail(image_bytes, size=PHOTO_THUMBNAIL_SIZE, quality=PHOTO_THUMBNAIL_QUALITY):
     """Создаёт лёгкое превью, не меняя оригинал в базе данных."""
     try:
         with Image.open(BytesIO(image_bytes)) as source:
             # Для JPEG draft уменьшает расход памяти ещё до полного декодирования.
-            source.draft("RGB", PHOTO_THUMBNAIL_SIZE)
+            source.draft("RGB", size)
             image = ImageOps.exif_transpose(source)
-            image.thumbnail(PHOTO_THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+            image.thumbnail(size, Image.Resampling.LANCZOS)
             if image.mode in {"RGBA", "LA"}:
                 background = Image.new("RGB", image.size, "white")
                 background.paste(image, mask=image.getchannel("A"))
@@ -43,7 +52,7 @@ def make_photo_thumbnail(image_bytes):
             image.save(
                 output,
                 format="JPEG",
-                quality=PHOTO_THUMBNAIL_QUALITY,
+                quality=quality,
                 optimize=True,
             )
             return output.getvalue()
@@ -52,15 +61,19 @@ def make_photo_thumbnail(image_bytes):
         return image_bytes
 
 
-def cached_photo_thumbnail(photo_id, image_digest, image_bytes):
+def cached_photo_thumbnail(photo_id, image_digest, image_bytes, preview=False):
     if not image_digest:
         image_digest = hashlib.sha256(image_bytes).hexdigest()
-    cache_path = photo_thumbnail_cache_path(photo_id, image_digest)
+    size, quality, suffix = (
+        (PHOTO_PREVIEW_SIZE, PHOTO_PREVIEW_QUALITY, "-preview") if preview
+        else (PHOTO_THUMBNAIL_SIZE, PHOTO_THUMBNAIL_QUALITY, "")
+    )
+    cache_path = photo_thumbnail_cache_path(photo_id, image_digest, suffix)
     try:
         if cache_path.exists():
             return cache_path.read_bytes()
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        thumbnail = make_photo_thumbnail(image_bytes)
+        thumbnail = make_photo_thumbnail(image_bytes, size, quality)
         temporary_path = cache_path.with_suffix(f".{secrets.token_hex(6)}.tmp")
         try:
             temporary_path.write_bytes(thumbnail)
@@ -70,7 +83,7 @@ def cached_photo_thumbnail(photo_id, image_digest, image_bytes):
         return thumbnail
     except OSError:
         # Недоступный кэш не должен мешать просмотру сайта.
-        return make_photo_thumbnail(image_bytes)
+        return make_photo_thumbnail(image_bytes, size, quality)
 
 
 def photo_review_group(photo):
@@ -109,7 +122,7 @@ def photo_details(connection, photo_id):
     columns = photo_columns(connection)
     fields = ("photo_date", "package_number", "mother_name", "review_status", "review_reason",
               "image_digest", "qr_data", "original_photo_id", "code_status",
-              "ai_generated_score")
+              "ai_generated_score", "package_brand", "package_formula")
     optional = ", ".join(f"p.{field}" if field in columns else f"NULL AS {field}" for field in fields)
     hospital = "COALESCE(p.maternity_hospital, sender.maternity_hospital)" if "maternity_hospital" in columns else "sender.maternity_hospital"
     row = connection.execute(
@@ -138,7 +151,8 @@ def photo_details_for_operator(connection, photo_id):
     if database_table_exists(connection, "photo_checks"):
         check = connection.execute(
             """SELECT decision, decision_reason, manual_decision, manual_reason,
-                      manual_reviewer, manual_at
+                      manual_reviewer, manual_at, product_status, material_status,
+                      duplicate_status, editing_status, location_status, assignment_status
                FROM photo_checks WHERE photo_id = ?""",
             (photo_id,),
         ).fetchone()
@@ -153,6 +167,17 @@ def photo_details_for_operator(connection, photo_id):
     photo["manual_decision"] = manual_decision
     photo["manual_reason"] = (check["manual_reason"] or "") if check else ""
     photo["manual_reviewer"] = (check["manual_reviewer"] or "") if check else ""
+    for field in ("product_status", "material_status", "duplicate_status", "editing_status",
+                  "location_status", "assignment_status"):
+        photo[field] = (check[field] or "") if check else ""
+    # Марку и номер смеси бот пока не записывает отдельно: берём из проверки товара.
+    photo["package_brand_auto"] = ""
+    photo["package_formula_auto"] = ""
+    product = (photo.get("product_status") or "").upper()
+    if not photo.get("package_brand") and "NUPPI" in product and "НЕ ПОДТВЕРЖД" not in product:
+        photo["package_brand_auto"] = "NUPPI GOLD" if "GOLD" in product else "NUPPI"
+        match = re.search(r"NUPPI(?:\s+GOLD)?\s+(\d)", product)
+        photo["package_formula_auto"] = match.group(1) if match else ""
     photo["manual_at_display"] = format_sent_at(check["manual_at"]) if check and check["manual_at"] else ""
     photo["decision_reason"] = (
         (check["manual_reason"] or check["decision_reason"] or "")

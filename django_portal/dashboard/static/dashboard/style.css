@@ -1276,3 +1276,81 @@ td .role-pill + small { margin-top: 3px; }
 .timeline-item b { font-weight: 650; }
 .timeline-item small { display: block; color: var(--faint); font-size: 12px; }
 .timeline-item p { margin-top: 3px; font-size: 13.5px; color: var(--muted); }
+
+/* ================= Карточка фото по ТЗ ================= */
+.count-pill { min-width: 26px; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 12.5px; font-weight: 750; text-align: center; }
+
+/* Готовые причины отклонения: видны, когда оператор работает с формой */
+.reason-chips { display: none; flex-wrap: wrap; gap: 6px; }
+.decision-form:focus-within .reason-chips, .detail-side .reason-chips, .compare-grid ~ .panel .reason-chips { display: flex; }
+.reason-chip {
+  min-height: 28px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-strong);
+  background: var(--surface); color: var(--ink); font-size: 12.5px; font-weight: 550; box-shadow: none !important; white-space: normal; text-align: left;
+}
+.reason-chip:hover { background: var(--bad-soft); border-color: var(--bad-line); color: var(--bad); }
+.reason-chip.is-picked { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+.field-pair { display: grid; grid-template-columns: 1fr 110px; gap: 8px; }
+
+/* Проверки */
+.check-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.check-row { display: grid; grid-template-columns: 12px minmax(130px, .8fr) minmax(0, 1.4fr); gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 9px; font-size: 13.5px; }
+.check-row:nth-child(odd) { background: var(--surface-2); }
+.check-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); transform: translateY(-1px); }
+.check-title { font-weight: 650; }
+.check-text { color: var(--muted); overflow-wrap: anywhere; }
+.check-row.ok .check-dot { background: #3fb56b; }
+.check-row.warn .check-dot { background: #e0a21b; }
+.check-row.warn .check-text { color: #7a5200; }
+.check-row.bad .check-dot { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+.check-row.bad .check-text { color: var(--bad); font-weight: 600; }
+@media (max-width: 560px) { .check-row { grid-template-columns: 12px 1fr; } .check-text { grid-column: 2; } }
+
+/* Похожие фото */
+.similar-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.similar-item {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px;
+  border: 1px solid var(--line); border-radius: 12px; color: var(--ink); text-decoration: none; background: var(--surface);
+  transition: border-color .15s, box-shadow .15s, transform .15s var(--ease);
+}
+a.similar-item:hover { border-color: var(--brand); box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+.similar-item img { width: 64px; height: 64px; border-radius: 9px; object-fit: cover; background: #ebe8f0; }
+.similar-item.is-foreign { grid-template-columns: 64px minmax(0, 1fr); background: var(--surface-2); color: var(--muted); }
+.similar-lock { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 9px; background: var(--line); color: var(--muted); }
+.similar-body { display: grid; gap: 4px; min-width: 0; }
+.similar-body small { color: var(--muted); font-size: 12px; }
+.similar-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.similar-top .decision-badge { font-size: 11px; padding: 2px 8px; }
+.similar-when { font-size: 11.5px; color: var(--bad); font-weight: 650; }
+.similar-when.later { color: var(--muted); }
+.similar-reasons { display: flex; gap: 5px; flex-wrap: wrap; }
+.reason-tag {
+  --tone: var(--muted); --soft: var(--surface-2);
+  display: inline-block; padding: 2px 8px; margin: 2px 2px 2px 0; border-radius: 7px; background: var(--soft); color: var(--tone);
+  font-size: 12px; font-weight: 650;
+}
+.reason-tag.same_file, .reason-tag.same_code, .reason-tag.same_name_date { --tone: var(--bad); --soft: var(--bad-soft); }
+.reason-tag.original, .reason-tag.copy { --tone: var(--brand-strong); --soft: var(--brand-soft); }
+.reason-tag.same_shot { --tone: #8a5a00; --soft: var(--warn-soft); }
+.reason-tag.visual { --tone: #1f6f8b; --soft: #e3f3f8; }
+.similar-go { color: var(--brand); font-size: 13px; font-weight: 650; white-space: nowrap; padding-right: 6px; }
+@media (max-width: 560px) { .similar-go { display: none; } .similar-item { grid-template-columns: 56px minmax(0, 1fr); } .similar-item img, .similar-lock { width: 56px; height: 56px; } }
+
+.inline-edit { margin-top: 10px; }
+.inline-edit > summary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; list-style: none; color: var(--brand); font-weight: 650; font-size: 14px; }
+.inline-edit > summary::-webkit-details-marker { display: none; }
+.inline-edit > summary .icon { width: 16px; height: 16px; }
+.inline-edit .collapsible-body { padding: 12px 0 0; border-top: 0; }
+
+/* Сравнение двух фото */
+.compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.compare-col { display: grid; gap: 10px; align-content: start; padding: 14px; }
+.compare-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.compare-head h2 small { color: var(--muted); font-weight: 500; font-size: 13px; margin-left: 6px; }
+.compare-image { display: block; border-radius: 12px; overflow: hidden; background: #15121b; }
+.compare-image img { display: block; width: 100%; height: min(62vh, 640px); object-fit: contain; }
+.compare-table td { width: 40%; }
+.compare-table td:first-child { width: 20%; }
+.compare-table tr.same td { background: var(--bad-soft); }
+.compare-table tr.same td:not(:first-child) { color: var(--bad); font-weight: 650; }
+.page-head .reason-tag { margin-top: 6px; }
+@media (max-width: 760px) { .compare-grid { grid-template-columns: 1fr; } .compare-image img { height: 46vh; } }

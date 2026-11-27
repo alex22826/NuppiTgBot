@@ -137,3 +137,11 @@ def database_revision():
         except OSError:
             revision.extend((None, None))
     return tuple(revision)
+
+
+def ensure_package_columns(connection):
+    """Поля «марка» и «номер смеси» в фото (ТЗ, раздел 7); старые базы дополняются."""
+    columns = photo_columns(connection)
+    for column in ("package_brand", "package_formula"):
+        if column not in columns:
+            connection.execute(f"ALTER TABLE photos ADD COLUMN {column} TEXT")
