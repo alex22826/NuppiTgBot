@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Тесты сайта
+        working-directory: django_portal
+        env:
+          PYTHONPATH: ..
+        # Тесты бота (dashboard.tests.test_bot) отстают от кода и будут
+        # включены здесь после их исправления.
+        run: python manage.py test dashboard.tests.test_site dashboard.tests.test_visit_system

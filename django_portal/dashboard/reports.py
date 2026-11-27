@@ -1,5 +1,6 @@
 """Данные и Excel-файлы сводных отчётов."""
 
+import os
 import re
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -16,7 +17,8 @@ from .periods import full_report_period
 from .photos import is_copy_or_crop_status
 from .text import doctor_search_condition, doctor_search_key, sent_at_local_date
 
-PHOTO_PAYMENT_RATE_SUM = 100_000
+# Оплата за одну принятую фотографию, сум. Тот же параметр читает Telegram-бот.
+PHOTO_PAYMENT_RATE_SUM = int(os.getenv("PHOTO_PAYMENT_RATE_SUM", "100000"))
 
 
 def full_ten_day_report_data(connection, now=None, date_from=None, date_to=None):
