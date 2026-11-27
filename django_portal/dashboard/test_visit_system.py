@@ -12,6 +12,7 @@ from django.urls import reverse
 import bot
 
 from . import views
+from . import photos as site_photos
 from .decision_rules import DECISION_REVIEW, automatic_photo_decision
 
 
@@ -39,14 +40,14 @@ class DecisionRuleTests(SimpleTestCase):
 
     def test_automatic_findings_keep_copy_yellow_and_ai_red(self):
         self.assertEqual(
-            views.photo_review_group({
+            site_photos.photo_review_group({
                 "review_status": "Возможная копия",
                 "code_status": "Код распознан: Ташкент",
             }),
             "yellow",
         )
         self.assertEqual(
-            views.photo_review_group({
+            site_photos.photo_review_group({
                 "review_status": "Обнаружено ИИ-изображение",
                 "code_status": "Код распознан: Ташкент",
             }),
@@ -117,7 +118,7 @@ class VisitSystemTests(SimpleTestCase):
             {"decision": "rejected", "reason": "Материал размещён неправильно", "next": "/"},
         )
         request.user = SimpleNamespace(is_authenticated=True, username="operator-1")
-        with patch.object(views.messages, "success"):
+        with patch('django.contrib.messages.success'):
             response = views.set_photo_decision(request, photo_id)
         self.assertEqual(response.status_code, 302)
         with sqlite3.connect(self.db_path) as connection:

@@ -16,6 +16,8 @@ from openpyxl import Workbook, load_workbook
 from PIL import Image
 
 from . import views
+from . import db as site_db, photos as site_photos, reports as site_reports, text as site_text
+from .views import photos as photo_views
 
 
 class OriginalPhotoTests(SimpleTestCase):
@@ -52,7 +54,7 @@ class OriginalPhotoTests(SimpleTestCase):
         self.connection.commit()
 
     def resolve(self, photo_id):
-        return views.resolve_original_photo(self.connection, views.photo_details(self.connection, photo_id))
+        return site_photos.resolve_original_photo(self.connection, site_photos.photo_details(self.connection, photo_id))
 
     def request(self, photo_id, authenticated=True):
         request = self.factory.get(reverse('photo_original', args=[photo_id]), {'city': 'City B', 'medic': '2'})
@@ -328,8 +330,8 @@ class OriginalPhotoTests(SimpleTestCase):
         request = self.factory.get('/', filters)
         request.user = SimpleNamespace(is_authenticated=True, username='operator')
         with override_settings(TIME_ZONE='Asia/Tashkent', USE_TZ=True), \
-             patch.object(views.timezone, 'now', return_value=now or datetime(2026, 9, 3, 12, tzinfo=timezone.utc)), \
-             patch.object(views, 'render', wraps=views.render) as rendering:
+             patch('django.utils.timezone.now', return_value=now or datetime(2026, 9, 3, 12, tzinfo=timezone.utc)), \
+             patch.object(photo_views, 'render', wraps=photo_views.render) as rendering:
             response = views.dashboard(request)
         return response, rendering.call_args.args[2]
 
@@ -364,7 +366,7 @@ class OriginalPhotoTests(SimpleTestCase):
             4, sender_telegram_id=2, doctor_name='Doctor B',
             sent_at='2026-08-01T12:00:00+00:00', image=b'not-an-image',
         )
-        views.ensure_photo_checks_table(self.connection)
+        site_db.ensure_photo_checks_table(self.connection)
         self.connection.executemany(
             '''INSERT INTO photo_checks (photo_id, manual_decision, manual_reason)
                VALUES (?, ?, ?)''',
@@ -378,7 +380,7 @@ class OriginalPhotoTests(SimpleTestCase):
         self.connection.commit()
 
         with override_settings(TIME_ZONE='Asia/Tashkent', USE_TZ=True):
-            report = views.rejected_photo_report_data(
+            report = site_reports.rejected_photo_report_data(
                 self.connection,
                 now=datetime(2026, 9, 3, 12, tzinfo=timezone.utc),
                 date_from='2026-08-01',
@@ -388,7 +390,7 @@ class OriginalPhotoTests(SimpleTestCase):
         self.assertEqual(report['total_photos'], 2)
         self.assertEqual(report['records'][0]['id'], 1)
         self.assertEqual(report['records'][0]['operator_comment'], 'QR-код использован повторно')
-        workbook = load_workbook(views.build_rejected_photo_report(report), data_only=True)
+        workbook = load_workbook(site_reports.build_rejected_photo_report(report), data_only=True)
         sheet = workbook['Общий отчёт']
         self.assertEqual(sheet['H2'].value, 'QR-код использован повторно')
         self.assertEqual(sheet['D2'].value, 'City A')
@@ -445,19 +447,19 @@ class OriginalPhotoTests(SimpleTestCase):
             4, sender_telegram_id=1, doctor_name='Doctor Alpha',
             sent_at='2026-08-02T10:00:00+00:00', image=b'not-an-image',
         )
-        views.ensure_photo_checks_table(self.connection)
+        site_db.ensure_photo_checks_table(self.connection)
         self.connection.executemany(
             '''INSERT INTO photo_checks (photo_id, manual_decision, manual_reason)
                VALUES (?, ?, ?)''',
             [(photo_id, 'rejected', f'Комментарий {photo_id}') for photo_id in range(1, 5)],
         )
         self.connection.create_function(
-            'DOCTOR_SEARCH_KEY', 1, views.doctor_search_key, deterministic=True,
+            'DOCTOR_SEARCH_KEY', 1, site_text.doctor_search_key, deterministic=True,
         )
         self.connection.commit()
 
         with override_settings(TIME_ZONE='Asia/Tashkent', USE_TZ=True):
-            report = views.rejected_photo_report_data(
+            report = site_reports.rejected_photo_report_data(
                 self.connection,
                 date_from='2026-08-01',
                 date_to='2026-08-01',
@@ -481,7 +483,7 @@ class OriginalPhotoTests(SimpleTestCase):
         self.add_photo(2, sent_at='2026-08-02T10:00:00+00:00')
         self.add_photo(3, sent_at='2026-08-03T10:00:00+00:00')
         with override_settings(TIME_ZONE='Asia/Tashkent', USE_TZ=True):
-            report = views.full_ten_day_report_data(
+            report = site_reports.full_ten_day_report_data(
                 self.connection,
                 now=datetime(2026, 9, 3, 12, tzinfo=timezone.utc),
                 date_from='2026-08-01',
@@ -614,7 +616,7 @@ class OriginalPhotoTests(SimpleTestCase):
     @override_settings(CREATOR_DJANGO_USERNAME='creator')
     def test_rename_hospital_moves_photos_and_merges_assignments_in_selected_city(self):
         self.connection.execute('ALTER TABLE photos ADD COLUMN maternity_hospital TEXT')
-        views.ensure_employee_hospitals_table(self.connection)
+        site_db.ensure_employee_hospitals_table(self.connection)
         self.connection.executemany(
             'INSERT INTO employee_hospitals (telegram_id, city, maternity_hospital) VALUES (?, ?, ?)',
             [
@@ -632,7 +634,7 @@ class OriginalPhotoTests(SimpleTestCase):
         })
         request.user = SimpleNamespace(is_authenticated=True, username='creator', id=99)
 
-        with patch.object(views.messages, 'success') as success:
+        with patch('django.contrib.messages.success') as success:
             response = views.rename_hospital(request)
 
         self.assertEqual(response.status_code, 302)
@@ -676,7 +678,7 @@ class OriginalPhotoTests(SimpleTestCase):
         request = self.factory.post(reverse('delete_employee_photos', args=[1]))
         request.user = SimpleNamespace(is_authenticated=True, username='creator', id=99)
 
-        with patch.object(views.messages, 'success') as success:
+        with patch('django.contrib.messages.success') as success:
             response = views.delete_employee_photos(request, 1)
 
         self.assertEqual(response.status_code, 302)
@@ -727,12 +729,12 @@ class OriginalPhotoTests(SimpleTestCase):
         )
         request = self.factory.post(reverse('delete_filtered_photos'), {
             'telegram_id': '1',
-            'location': views.encode_photo_location('City A', 'Hospital A'),
+            'location': site_text.encode_photo_location('City A', 'Hospital A'),
             'sent_date': '2026-09-03',
         })
         request.user = SimpleNamespace(is_authenticated=True, username='creator', id=99)
 
-        with patch.object(views.messages, 'success') as success:
+        with patch('django.contrib.messages.success') as success:
             response = views.delete_filtered_photos(request)
 
         self.assertEqual(response.status_code, 302)
@@ -753,7 +755,7 @@ class OriginalPhotoTests(SimpleTestCase):
         })
         request.user = SimpleNamespace(is_authenticated=True, username='creator', id=99)
 
-        with patch.object(views.messages, 'error') as error:
+        with patch('django.contrib.messages.error') as error:
             response = views.delete_filtered_photos(request)
 
         self.assertEqual(response.status_code, 302)
@@ -768,7 +770,7 @@ class OriginalPhotoTests(SimpleTestCase):
         self.connection.commit()
         _, context = self.dashboard_at()
         self.assertEqual(context['summary']['photo_count'], 305)
-        self.assertEqual(len(context['photos']), views.PHOTO_PAGE_SIZE)
+        self.assertEqual(len(context['photos']), photo_views.PHOTO_PAGE_SIZE)
         self.assertEqual(context['photo_page_count'], 16)
 
     def test_period_counter_formats_open_date_range(self):
@@ -813,23 +815,23 @@ class SentAtFormattingTests(SimpleTestCase):
     def test_utc_and_local_offset_show_the_same_minute_without_seconds(self):
         for value in ('2026-09-03T11:56:47.536864+00:00', '2026-09-03T16:56:47.536864+05:00'):
             with self.subTest(value=value):
-                self.assertEqual(views.format_sent_at(value), '03.09.2026 16:56')
+                self.assertEqual(site_text.format_sent_at(value), '03.09.2026 16:56')
 
     def test_legacy_naive_z_and_datetime_values(self):
         for value in ('2026-09-03T11:56:47Z', '2026-09-03 11:56:47',
                       datetime(2026, 9, 3, 11, 56, 47), datetime(2026, 9, 3, 11, 56, 47, tzinfo=timezone.utc)):
             with self.subTest(value=value):
-                self.assertEqual(views.format_sent_at(value), '03.09.2026 16:56')
+                self.assertEqual(site_text.format_sent_at(value), '03.09.2026 16:56')
 
     def test_local_midnight_and_new_year_rollover(self):
-        self.assertEqual(views.format_sent_at('2026-09-03T18:59:59+00:00'), '03.09.2026 23:59')
-        self.assertEqual(views.format_sent_at('2026-09-03T19:00:00+00:00'), '04.09.2026 00:00')
-        self.assertEqual(views.format_sent_at('2026-12-31T20:15:01+00:00'), '01.01.2027 01:15')
+        self.assertEqual(site_text.format_sent_at('2026-09-03T18:59:59+00:00'), '03.09.2026 23:59')
+        self.assertEqual(site_text.format_sent_at('2026-09-03T19:00:00+00:00'), '04.09.2026 00:00')
+        self.assertEqual(site_text.format_sent_at('2026-12-31T20:15:01+00:00'), '01.01.2027 01:15')
 
     def test_empty_or_invalid_values_are_safe(self):
         for value in (None, '', '   ', 'not a date', '2026-13-03T11:56:47+00:00'):
             with self.subTest(value=value):
-                self.assertEqual(views.format_sent_at(value), '—')
+                self.assertEqual(site_text.format_sent_at(value), '—')
 
 
 class BotPhotoTests(SimpleTestCase):
