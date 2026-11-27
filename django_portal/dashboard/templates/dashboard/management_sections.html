@@ -1,11 +1,3 @@
-<nav class="subnav" aria-label="Разделы управления">
-<a href="#employees">Сотрудники</a>
-<a href="#operators">Входы на сайт</a>
-<a href="#assignments">Задания для визитов</a>
-<a href="#hospitals">Роддома</a>
-<a class="danger-link" href="#cleanup">Удаление фото</a>
-</nav>
-
 <section class="panel manage-section" id="employees" aria-labelledby="employees-title">
 <div class="panel-head">
 <div><h2 id="employees-title">Сотрудники бота</h2><p>Медики отправляют фото, операторы получают отчёты в боте. Добавленный здесь человек сразу получает доступ к боту.</p></div>
@@ -26,10 +18,16 @@
 </form>
 </details>
 {% if registered_users %}
-<div class="table-wrap has-menus" style="margin-top:14px"><table>
-<thead><tr><th>Сотрудник</th><th>Роль</th><th>Telegram ID</th><th class="num">Фото</th><th>Доступ</th><th></th></tr></thead>
-<tbody>{% for item in registered_users %}<tr{% if not item.is_active %} class="row-off"{% endif %}>
-<td><b>{{ item.full_name }}</b><small>{{ item.city|default:'' }}{% if item.username %} · @{{ item.username }}{% endif %}</small></td>
+<div class="table-tools" data-table-filter="#employees-table">
+<label class="search-box"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Поиск сотрудника</span><input type="search" name="q" placeholder="Поиск: ФИО, город, ID"></label>
+<label class="select-inline"><span class="sr-only">Роль</span><select name="role"><option value="">Все роли</option><option value="Медик">Медики</option><option value="Оператор">Операторы</option></select></label>
+<label class="select-inline"><span class="sr-only">Доступ</span><select name="status"><option value="">Любой доступ</option><option value="on">Доступ открыт</option><option value="off">Доступ отключён</option></select></label>
+<span class="hint table-count" data-filter-count></span>
+</div>
+<div class="table-wrap has-menus"><table id="employees-table" data-sortable>
+<thead><tr><th data-sort="text">Сотрудник</th><th data-sort="text">Роль</th><th data-sort="num">Telegram ID</th><th class="num" data-sort="num">Фото</th><th data-sort="text">Доступ</th><th></th></tr></thead>
+<tbody>{% for item in registered_users %}<tr data-filter-item data-role="{{ item.role }}" data-status="{% if item.is_active %}on{% else %}off{% endif %}"{% if not item.is_active %} class="row-off"{% endif %}>
+<td data-value="{{ item.full_name }}"><b>{{ item.full_name }}</b><small>{{ item.city|default:'' }}{% if item.username %} · @{{ item.username }}{% endif %}</small></td>
 <td>{{ item.role }}</td>
 <td>{{ item.telegram_id }}</td>
 <td class="num">{{ item.photo_count }}</td>
@@ -44,7 +42,8 @@
 </div></details>
 </div></td>
 </tr>{% endfor %}</tbody>
-</table></div>
+</table>
+<p class="hint filter-empty" hidden style="padding:16px">Никого не найдено — измените поиск или фильтры.</p></div>
 {% endif %}
 </section>
 
@@ -77,8 +76,8 @@
 <div class="form-actions"><button>Добавить задание</button></div>
 </form>
 </details>
-{% if assignments %}<div class="table-wrap" style="margin-top:14px"><table>
-<thead><tr><th>Медик</th><th>Где</th><th>Врач</th><th>Продукт</th><th>Материал</th><th>Период</th><th></th></tr></thead>
+{% if assignments %}<div class="table-wrap" style="margin-top:14px"><table data-sortable>
+<thead><tr><th data-sort="text">Медик</th><th data-sort="text">Где</th><th data-sort="text">Врач</th><th data-sort="text">Продукт</th><th data-sort="text">Материал</th><th data-sort="text">Период</th><th></th></tr></thead>
 <tbody>{% for item in assignments %}<tr><td>{{ item.medic_name }}</td><td>{{ item.city }} · {{ item.maternity_hospital }}</td><td>{{ item.doctor_name|default:'Любой' }}</td><td>{{ item.required_product|default:'—' }}</td><td>{{ item.required_material|default:'—' }}</td><td>{{ item.date_from|default:'…' }} — {{ item.date_to|default:'…' }}</td><td><div class="cell-actions"><form method="post" action="{% url 'delete_visit_assignment' item.id %}" onsubmit="return confirm('Удалить это задание?')">{% csrf_token %}<button class="btn-danger-outline btn-sm">Удалить</button></form></div></td></tr>{% endfor %}</tbody>
 </table></div>{% else %}<p class="hint" style="margin-top:12px">Заданий пока нет.</p>{% endif %}
 </section>

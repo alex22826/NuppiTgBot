@@ -1,10 +1,11 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Фотографии — Nuppi{% endblock %}
+{% block crumbs %}<span>Фотографии</span>{% if selected_decision == 'review' %}<span>На проверке</span>{% elif selected_decision == 'accepted' %}<span>Принято</span>{% elif selected_decision == 'rejected' %}<span>Отклонено</span>{% endif %}{% endblock %}
 {% block content %}
 <div class="page-head">
 <div>
 <h1>Фотографии</h1>
-<p>Проверьте фото от медиков и поставьте итог: «Принять» или «Отклонить». Автоматика только подсвечивает подозрительные снимки, решение всегда за оператором.</p>
+<p>Проверьте фото от медиков и поставьте итог. Автоматика только подсвечивает подозрительные снимки — решение за оператором.</p>
 </div>
 </div>
 {% if database_error %}<p class="error">{{ database_error }} Укажите BOT_DB_PATH в файле .env.</p>{% else %}
@@ -16,46 +17,72 @@
 <a class="status-tab rejected{% if selected_decision == 'rejected' %} is-active{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=rejected"><span class="count">{{ decision_counts.rejected }}</span><span class="label">Отклонено</span></a>
 </nav>
 
-<form class="panel filter-bar" method="get" aria-label="Фильтры">
+<form class="panel filter-bar" method="get" aria-label="Фильтры" id="photo-filters">
 {% if selected_decision %}<input type="hidden" name="decision" value="{{ selected_decision }}">{% endif %}
+{% if selected_sort != 'new' %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
+{% if not group_by_flag %}<input type="hidden" name="group" value="none">{% endif %}
+<details class="filter-toggle" {% if has_filters %}open{% endif %} data-remember="nuppi.filtersOpen">
+<summary><svg class="icon"><use href="#i-filter"/></svg>Фильтры{% if filter_chips %} <span class="pill">{{ filter_chips|length }}</span>{% endif %}<span class="chev" aria-hidden="true">▾</span></summary>
+<div class="filter-body">
 <div class="form-grid">
 <label class="field"><span>Город</span><select name="city" onchange="this.form.elements.hospital.value='';this.form.elements.doctor.value='';this.form.submit()"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}"{% if item == selected_city %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
-<label class="field"><span>Роддом</span><select name="hospital" onchange="this.form.elements.doctor.value='';this.form.submit()"{% if not selected_city %} title="Сначала выберите город"{% endif %}><option value="">{% if selected_city %}Все роддома{% else %}Сначала город{% endif %}</option>{% for item in hospitals %}<option value="{{ item }}"{% if item == selected_hospital %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label class="field"><span>Роддом</span><select name="hospital" onchange="this.form.elements.doctor.value='';this.form.submit()"><option value="">{% if selected_city %}Все роддома{% else %}Сначала город{% endif %}</option>{% for item in hospitals %}<option value="{{ item }}"{% if item == selected_hospital %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
 <label class="field"><span>Врач</span><select name="doctor"><option value="">Все врачи</option>{% for group in doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}"{% if doctor == selected_doctor %} selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
 <label class="field"><span>Медик</span><select name="medic"><option value="">Все медики</option>{% for medic in medics %}<option value="{{ medic.telegram_id }}"{% if medic.telegram_id == selected_medic_id %} selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label>
 <label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ selected_date_from }}"></label>
 <label class="field"><span>По дату</span><input type="date" name="date_to" value="{{ selected_date_to }}"></label>
 </div>
 <div class="form-actions">
-<button type="submit">Показать</button>
-{% if has_filters %}<a class="btn btn-ghost" href="{% url 'dashboard' %}">Сбросить фильтры</a>{% endif %}
-<button type="submit" class="btn-secondary" formaction="{% url 'export_photos' %}" style="margin-left:auto">⬇ Excel по этим фильтрам</button>
+<button type="submit">Применить</button>
+{% if has_filters %}<a class="btn btn-ghost" href="{% url 'dashboard' %}{% if selected_decision %}?decision={{ selected_decision }}{% endif %}">Сбросить все</a>{% endif %}
+<button type="submit" class="btn-secondary push-right" formaction="{% url 'export_photos' %}"><svg class="icon"><use href="#i-download"/></svg>Excel по этим фильтрам</button>
 </div>
-<div class="filter-summary">
+</div>
+</details>
+{% if filter_chips %}<div class="chips" aria-label="Выбранные фильтры">{% for chip in filter_chips %}<a class="chip" href="?{{ chip.remove_query }}" title="Убрать фильтр"><span class="chip-title">{{ chip.title }}:</span> {{ chip.value }}<svg class="icon"><use href="#i-x"/></svg></a>{% endfor %}</div>{% endif %}
+</form>
+
+<div class="toolbar">
+<div class="toolbar-stats">
 <span class="stat" id="period-photo-counter">Найдено <b>{{ summary.photo_count }}</b> фото</span>
 <span class="stat">Период: <b>{{ selected_period_label }}</b></span>
 <span class="stat">Визитов: <b>{{ summary.visit_count }}</b></span>
 <span class="stat">Медиков: <b>{{ medic_total.medic_count }}</b></span>
 <span class="stat">За всё время: <b>{{ scope_summary.photo_count }}</b></span>
 </div>
+<form class="toolbar-controls" method="get">
+{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'page' and key != 'group' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+<label class="select-inline"><svg class="icon"><use href="#i-sort"/></svg><span class="sr-only">Сортировка</span><select name="sort" onchange="this.form.submit()">{% for key, label in photo_sorts.items %}<option value="{{ key }}"{% if key == selected_sort %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label class="select-inline"><span class="sr-only">Группировка</span><select name="group" onchange="this.form.submit()"><option value="flag"{% if group_by_flag %} selected{% endif %}>Группы по проверке</option><option value="none"{% if not group_by_flag %} selected{% endif %}>Без групп</option></select></label>
+<noscript><button type="submit" class="btn-secondary btn-sm">Применить</button></noscript>
+<div class="segmented" role="group" aria-label="Вид списка">
+<button type="button" class="seg" data-photo-view="grid" title="Плиткой" aria-label="Плиткой"><svg class="icon"><use href="#i-grid"/></svg></button>
+<button type="button" class="seg" data-photo-view="list" title="Списком" aria-label="Списком"><svg class="icon"><use href="#i-list"/></svg></button>
+</div>
 </form>
+</div>
 
 {% if not photos %}
-<div class="empty" style="margin-top:20px"><b>Фотографий не найдено</b>{% if has_filters or selected_decision %}Попробуйте изменить фильтры или <a href="{% url 'dashboard' %}">сбросить их</a>.{% else %}Здесь появятся фото, которые медики отправят через бота.{% endif %}</div>
+<div class="empty"><div class="empty-icon"><svg class="icon"><use href="#i-photo"/></svg></div><b>Фотографий не найдено</b>{% if has_filters or selected_decision %}Попробуйте изменить фильтры или <a href="{% url 'dashboard' %}">сбросить их</a>.{% else %}Здесь появятся фото, которые медики отправят через бота.{% endif %}</div>
 {% else %}
-{% include 'dashboard/photo_pagination.html' %}
+<div class="photo-results">
+{% if group_by_flag %}
 {% if photo_groups.red %}<section class="photo-group red" aria-labelledby="group-red">
 <div class="photo-group-head"><span class="dot"></span><h2 id="group-red">Похоже на ИИ или подделку</h2><span class="count">{{ photo_groups.red|length }}</span><p>Проверьте в первую очередь: автоматика нашла признаки генерации или монтажа.</p></div>
-<div class="photo-grid">{% for photo in photo_groups.red %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='red' %}{% endfor %}</div>
+<div class="photo-grid" data-stagger>{% for photo in photo_groups.red %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='red' %}{% endfor %}</div>
 </section>{% endif %}
 {% if photo_groups.yellow %}<section class="photo-group yellow" aria-labelledby="group-yellow">
 <div class="photo-group-head"><span class="dot"></span><h2 id="group-yellow">Нужно посмотреть внимательнее</h2><span class="count">{{ photo_groups.yellow|length }}</span><p>Возможная копия или обрезка, код другого региона или фото ещё не проверено автоматикой.</p></div>
-<div class="photo-grid">{% for photo in photo_groups.yellow %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='yellow' %}{% endfor %}</div>
+<div class="photo-grid" data-stagger>{% for photo in photo_groups.yellow %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='yellow' %}{% endfor %}</div>
 </section>{% endif %}
 {% if photo_groups.clear %}<section class="photo-group clear" aria-labelledby="group-clear">
 <div class="photo-group-head"><span class="dot"></span><h2 id="group-clear">Без замечаний</h2><span class="count">{{ photo_groups.clear|length }}</span></div>
-<div class="photo-grid">{% for photo in photo_groups.clear %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='clear' %}{% endfor %}</div>
+<div class="photo-grid" data-stagger>{% for photo in photo_groups.clear %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='clear' %}{% endfor %}</div>
 </section>{% endif %}
+{% else %}
+<div class="photo-grid" data-stagger>{% for photo in photos %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class=photo.review_group %}{% endfor %}</div>
+{% endif %}
+</div>
 {% include 'dashboard/photo_pagination.html' %}
 {% endif %}
 {% endif %}

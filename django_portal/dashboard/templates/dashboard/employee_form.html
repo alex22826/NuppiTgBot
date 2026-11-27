@@ -1,7 +1,7 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}{{ employee.full_name }} — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'management' %}">Управление</a><a href="{% url 'management' %}#employees">Сотрудники</a><span>{{ employee.full_name }}</span>{% endblock %}
 {% block content %}
-<a class="back-link" href="{% url 'management' %}#employees">← Сотрудники</a>
 <div class="page-head"><div><h1>{{ employee.full_name }}</h1><p>Изменения сразу применяются в боте.</p></div></div>
 <form class="panel" method="post" style="max-width:760px">{% csrf_token %}
 <div class="form-grid">

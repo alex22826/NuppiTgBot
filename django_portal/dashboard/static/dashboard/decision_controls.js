@@ -25,15 +25,33 @@
     if (!count) return;
     const value = Number.parseInt(count.textContent, 10);
     if (Number.isFinite(value)) count.textContent = String(Math.max(0, value + change));
+    count.classList.remove("is-bumped");
+    void count.offsetWidth;
+    count.classList.add("is-bumped");
+  }
+
+  function updateSidebarBadge(change) {
+    const badge = document.querySelector(".side-badge");
+    if (!badge) return;
+    const value = Math.max(0, (Number.parseInt(badge.textContent, 10) || 0) + change);
+    badge.textContent = String(value);
+    badge.hidden = value === 0;
   }
 
   function updateCard(form, result) {
     const card = form.closest("[data-photo-card]");
     const badge = card && card.querySelector(".decision-badge");
     if (badge) {
-      badge.classList.remove(...decisions);
+      badge.classList.remove(...decisions, "is-updated");
       badge.classList.add(result.decision);
       badge.textContent = result.decision_label;
+      void badge.offsetWidth;
+      badge.classList.add("is-updated");
+    }
+    if (card) {
+      card.classList.remove("is-saved");
+      void card.offsetWidth;
+      card.classList.add("is-saved");
     }
 
     form.querySelectorAll(".decision-actions button").forEach((button) => {
@@ -44,6 +62,8 @@
     if (result.previous_decision !== result.decision) {
       updateCounter(result.previous_decision, -1);
       updateCounter(result.decision, 1);
+      const change = (result.decision === "review" ? 1 : 0) - (result.previous_decision === "review" ? 1 : 0);
+      if (change) updateSidebarBadge(change);
     }
   }
 
@@ -113,6 +133,8 @@
       if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить итог.");
       updateCard(form, result);
       setStatus(form, `Сохранено: ${result.decision_label}.`, "success");
+      const number = form.action.match(/photo\/(\d+)\//);
+      if (window.nuppiToast) window.nuppiToast(`Фото${number ? ` №${number[1]}` : ""}: ${result.decision_label}`);
     } catch (error) {
       setStatus(form, error.message || "Не удалось сохранить итог.", "error");
     } finally {
@@ -146,6 +168,7 @@
       }
       updateMetadataCard(form, result);
       setMetadataStatus(form, result.message || "Данные фотографии сохранены.", "success");
+      if (window.nuppiToast) window.nuppiToast(result.message || "Данные фотографии сохранены.");
     } catch (error) {
       setMetadataStatus(form, error.message || "Не удалось сохранить данные фотографии.", "error");
     } finally {

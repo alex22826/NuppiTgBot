@@ -1,5 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Отчёты — Nuppi{% endblock %}
+{% block crumbs %}<span>Отчёты</span>{% endblock %}
 {% block content %}
 <div class="page-head">
 <div>
@@ -60,9 +61,9 @@
 
 <section class="section" aria-labelledby="medic-stats">
 <div class="section-head"><h2 id="medic-stats">Статистика медиков</h2><span class="count">{{ selected_period_label }}</span><p>Сколько фото прислал каждый медик и чем закончилась проверка. Фильтры берутся со страницы «Фотографии».</p></div>
-{% if medic_stats %}<div class="table-wrap"><table>
-<thead><tr><th>Медик</th><th class="num">Визиты</th><th class="num">Фото</th><th class="num">Принято</th><th class="num">На проверке</th><th class="num">Отклонено</th></tr></thead>
-<tbody>{% for medic in medic_stats %}<tr><td>{{ medic.medic_name }}<small>ID {{ medic.sender_telegram_id }}</small></td><td class="num">{{ medic.visit_count }}</td><td class="num">{{ medic.photo_count }}</td><td class="num">{{ medic.accepted_count }}</td><td class="num">{{ medic.review_count }}</td><td class="num">{{ medic.rejected_count }}</td></tr>{% endfor %}</tbody>
+{% if medic_stats %}<div class="table-wrap"><table data-sortable>
+<thead><tr><th data-sort="text">Медик</th><th class="num" data-sort="num">Визиты</th><th class="num" data-sort="num">Фото</th><th class="num" data-sort="num">Принято</th><th class="num" data-sort="num">На проверке</th><th class="num" data-sort="num">Отклонено</th></tr></thead>
+<tbody>{% for medic in medic_stats %}<tr><td data-value="{{ medic.medic_name }}">{{ medic.medic_name }}<small>ID {{ medic.sender_telegram_id }}</small></td><td class="num">{{ medic.visit_count }}</td><td class="num">{{ medic.photo_count }}</td><td class="num">{{ medic.accepted_count }}</td><td class="num">{{ medic.review_count }}</td><td class="num">{{ medic.rejected_count }}</td></tr>{% endfor %}</tbody>
 </table></div>{% else %}<div class="empty"><b>Нет данных</b>За выбранный период медики не присылали фото.</div>{% endif %}
 </section>
 {% endif %}

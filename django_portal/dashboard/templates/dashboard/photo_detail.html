@@ -1,7 +1,7 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Фотография №{{ photo.id }} — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'dashboard' %}">Фотографии</a><span>№{{ photo.id }}</span>{% endblock %}
 {% block content %}
-<a class="back-link" href="{% url 'dashboard' %}">← Все фотографии</a>
 <div class="page-head">
 <div>
 <h1>Фотография №{{ photo.id }}</h1>

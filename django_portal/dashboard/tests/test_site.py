@@ -192,11 +192,38 @@ class OriginalPhotoTests(SimpleTestCase):
         self.assertFalse(context['has_filters'])
         self.assertContains(response, reverse('reports'))
         self.assertContains(response, 'class="status-tab review')
-        self.assertNotContains(response, 'Сбросить фильтры')
+        self.assertNotContains(response, 'Сбросить все')
+        self.assertEqual(context['filter_chips'], [])
 
-        response, context = self.dashboard_at(city='Ташкент')
+        response, context = self.dashboard_at(city='Ташкент', hospital='Роддом', page='2')
         self.assertTrue(context['has_filters'])
-        self.assertContains(response, 'Сбросить фильтры')
+        self.assertContains(response, 'Сбросить все')
+        chips = {chip['title']: chip for chip in context['filter_chips']}
+        # Убрать город — значит убрать и зависящий от него роддом; страница сбрасывается.
+        self.assertEqual(chips['Город']['remove_query'], '')
+        self.assertEqual(chips['Роддом']['remove_query'], 'city=%D0%A2%D0%B0%D1%88%D0%BA%D0%B5%D0%BD%D1%82')
+
+    def test_photo_list_sorting_is_whitelisted(self):
+        self.add_photo(1, sent_at='2026-09-01T10:00:00+00:00')
+        self.add_photo(2, sent_at='2026-09-02T10:00:00+00:00')
+        self.add_photo(3, sent_at='2026-09-03T10:00:00+00:00')
+        _, context = self.dashboard_at()
+        self.assertEqual([photo['id'] for photo in context['photos']], [3, 2, 1])
+        _, context = self.dashboard_at(sort='old')
+        self.assertEqual(context['selected_sort'], 'old')
+        self.assertEqual([photo['id'] for photo in context['photos']], [1, 2, 3])
+        _, context = self.dashboard_at(sort='p.id; DROP TABLE photos')
+        self.assertEqual(context['selected_sort'], 'new')
+        self.assertEqual([photo['id'] for photo in context['photos']], [3, 2, 1])
+
+    def test_photo_list_without_groups_keeps_sort_order(self):
+        self.add_photo(1, sent_at='2026-09-01T10:00:00+00:00', review_status='Возможное ИИ-изображение')
+        self.add_photo(2, sent_at='2026-09-02T10:00:00+00:00')
+        response, context = self.dashboard_at(group='none')
+        self.assertFalse(context['group_by_flag'])
+        self.assertNotContains(response, 'Похоже на ИИ или подделку')
+        html = response.content.decode()
+        self.assertLess(html.index('Фото 2'), html.index('Фото 1'))
 
     def test_reports_page_shows_medic_statistics(self):
         self.add_photo(1, sent_at='2026-09-03T10:00:00+00:00')

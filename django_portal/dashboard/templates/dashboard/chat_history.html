@@ -1,5 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Переписка с пользователями — Nuppi{% endblock %}
+{% block crumbs %}<span>Переписка</span>{% endblock %}
 {% block content %}
 <div class="page-head">
 <div>
@@ -12,12 +13,16 @@
 {% elif not conversations %}<div class="empty"><b>Сообщений пока нет</b>Здесь появится переписка, как только кто-то напишет боту.</div>
 {% else %}
 <div class="chat-layout">
-<nav class="panel chat-list" aria-label="Пользователи">
-{% for conversation in conversations %}<a href="?telegram_id={{ conversation.telegram_id }}{% if selected_date_from %}&amp;date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&amp;date_to={{ selected_date_to }}{% endif %}"{% if conversation.telegram_id == selected_telegram_id %} aria-current="true"{% endif %}>
+<div class="panel chat-side">
+<label class="search-box"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Поиск по пользователям</span><input type="search" placeholder="Поиск по имени или ID" data-filter-list="#chat-list"></label>
+<nav class="chat-list" id="chat-list" aria-label="Пользователи">
+{% for conversation in conversations %}<a data-filter-item href="?telegram_id={{ conversation.telegram_id }}{% if selected_date_from %}&amp;date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&amp;date_to={{ selected_date_to }}{% endif %}"{% if conversation.telegram_id == selected_telegram_id %} aria-current="true"{% endif %}>
 <span class="name">{{ conversation.full_name }}</span><span class="badge">{{ conversation.message_count }}</span>
 <span class="sub">ID {{ conversation.telegram_id }}{% if conversation.username %} · @{{ conversation.username }}{% endif %}</span>
 </a>{% endfor %}
+<p class="hint filter-empty" hidden>Никого не найдено</p>
 </nav>
+</div>
 <div class="chat-main">
 <div class="chat-head">
 <div>{% if selected_conversation %}<h2>{{ selected_conversation.full_name }}</h2><p class="hint">Telegram ID: {{ selected_conversation.telegram_id }}{% if selected_conversation.username %} · @{{ selected_conversation.username }}{% endif %}</p>{% endif %}</div>

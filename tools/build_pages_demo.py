@@ -229,6 +229,11 @@ class SiteSnapshot:
         return "../" * page.count("/") + target
 
     def static_target(self, url: str) -> str:
+        url, hash_mark, fragment = url.partition("#")
+        target = self._static_target(url)
+        return f"{target}#{fragment}" if hash_mark and target != "#" else target
+
+    def _static_target(self, url: str) -> str:
         path, _, query = url.partition("?")
         if path in ("", "/"):
             page_match = re.fullmatch(r"page=(\d+)", query)
