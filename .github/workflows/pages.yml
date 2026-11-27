@@ -1,9 +1,11 @@
 name: demo-site
 
 # Пересобирает демо-версию панели на GitHub Pages при каждом обновлении main.
+# В pull request демо только собирается — так видно, что сборка не сломана.
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -12,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +36,7 @@ jobs:
           path: _site
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
