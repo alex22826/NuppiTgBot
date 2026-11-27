@@ -37,18 +37,27 @@ document.addEventListener("DOMContentLoaded", () => {
         applyTransform();
     };
 
+    const openViewer = (href, downloadHref, alt) => {
+        resetTransform();
+        image.src = href;
+        image.alt = alt || "Просматриваемая фотография";
+        openLink.href = href;
+        downloadLink.href = downloadHref || href;
+        dialog.showModal();
+    };
+    window.nuppiOpenViewer = openViewer;
+
     document.querySelectorAll(".photo-viewer-link").forEach((link) => {
         link.addEventListener("click", (event) => {
             if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
                 return;
             }
+            // В списке фото по клику открывается окно с данными, а не только снимок.
+            if (link.hasAttribute("data-photo-open") && window.nuppiPhotoPanel) {
+                return;
+            }
             event.preventDefault();
-            resetTransform();
-            image.src = link.href;
-            image.alt = link.querySelector("img")?.alt || "Просматриваемая фотография";
-            openLink.href = link.href;
-            downloadLink.href = link.dataset.downloadUrl || link.href;
-            dialog.showModal();
+            openViewer(link.href, link.dataset.downloadUrl, link.querySelector("img")?.alt);
         });
     });
 

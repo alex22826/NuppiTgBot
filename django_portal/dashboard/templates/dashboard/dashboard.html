@@ -5,41 +5,53 @@
 <div class="page-head">
 <div>
 <h1>Фотографии</h1>
-<p>Проверьте фото от медиков и поставьте итог. Автоматика только подсвечивает подозрительные снимки — решение за оператором.</p>
+<p>Нажмите на фото, чтобы открыть его целиком вместе со всеми данными. Автоматика только подсвечивает подозрительные снимки — итог ставит оператор.</p>
 </div>
 </div>
 {% if database_error %}<p class="error">{{ database_error }} Укажите BOT_DB_PATH в файле .env.</p>{% else %}
 
-<nav class="status-tabs" aria-label="Итог проверки">
-<a class="status-tab all{% if not selected_decision %} is-active{% endif %}" href="?{{ decision_query }}"><span class="tab-icon"><svg class="icon" aria-hidden="true"><use href="#i-photo"/></svg></span><span class="count">{{ decision_total }}</span><span class="label">Все</span></a>
-<a class="status-tab review{% if selected_decision == 'review' %} is-active{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=review"><span class="tab-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span><span class="count">{{ decision_counts.review }}</span><span class="label">На проверке</span></a>
-<a class="status-tab accepted{% if selected_decision == 'accepted' %} is-active{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=accepted"><span class="tab-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg></span><span class="count">{{ decision_counts.accepted }}</span><span class="label">Принято</span></a>
-<a class="status-tab rejected{% if selected_decision == 'rejected' %} is-active{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=rejected"><span class="tab-icon"><svg class="icon" aria-hidden="true"><use href="#i-x-circle"/></svg></span><span class="count">{{ decision_counts.rejected }}</span><span class="label">Отклонено</span></a>
+<nav class="stat-cards" aria-label="Итог проверки">
+<a class="stat-card all{% if not selected_decision %} is-active{% endif %}" href="?{{ decision_query }}">
+<span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-photo"/></svg></span>
+<span class="stat-text"><span class="label">Все фото</span><span class="count">{{ decision_total }}</span></span>
+<span class="stat-note">за выбранный период</span>
+</a>
+<a class="stat-card review{% if selected_decision == 'review' %} is-active{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=review">
+<span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
+<span class="stat-text"><span class="label">На проверке</span><span class="count">{{ decision_counts.review }}</span></span>
+<span class="stat-note"><span class="meter"><i style="width: {{ decision_share.review }}%"></i></span>{{ decision_share.review }}%</span>
+</a>
+<a class="stat-card accepted{% if selected_decision == 'accepted' %} is-active{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=accepted">
+<span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg></span>
+<span class="stat-text"><span class="label">Принято</span><span class="count">{{ decision_counts.accepted }}</span></span>
+<span class="stat-note"><span class="meter"><i style="width: {{ decision_share.accepted }}%"></i></span>{{ decision_share.accepted }}%</span>
+</a>
+<a class="stat-card rejected{% if selected_decision == 'rejected' %} is-active{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=rejected">
+<span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-x-circle"/></svg></span>
+<span class="stat-text"><span class="label">Отклонено</span><span class="count">{{ decision_counts.rejected }}</span></span>
+<span class="stat-note"><span class="meter"><i style="width: {{ decision_share.rejected }}%"></i></span>{{ decision_share.rejected }}%</span>
+</a>
 </nav>
 
 <form class="panel filter-bar" method="get" aria-label="Фильтры" id="photo-filters">
 {% if selected_decision %}<input type="hidden" name="decision" value="{{ selected_decision }}">{% endif %}
 {% if selected_sort != 'new' %}<input type="hidden" name="sort" value="{{ selected_sort }}">{% endif %}
 {% if not group_by_flag %}<input type="hidden" name="group" value="none">{% endif %}
-<details class="filter-toggle" {% if has_filters %}open{% endif %} data-remember="nuppi.filtersOpen">
-<summary><span class="summary-icon"><svg class="icon" aria-hidden="true"><use href="#i-filter"/></svg></span>Фильтры{% if filter_chips %} <span class="pill">{{ filter_chips|length }}</span>{% endif %}<span class="chev"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></span></summary>
-<div class="filter-body">
+<div class="filter-main">
+<label class="field filter-search"><span>Поиск</span><span class="search-box"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><input type="search" name="q" value="{{ search_text }}" placeholder="№ фото, врач, медик, роддом или QR"></span></label>
+<div class="field daterange" data-daterange data-autosubmit><span>Период отправки</span><div class="daterange-inputs"><input type="date" name="date_from" value="{{ selected_date_from }}" aria-label="С даты"><input type="date" name="date_to" value="{{ selected_date_to }}" aria-label="По дату"></div></div>
+<label class="field"><span>Сотрудник (кто прислал)</span><select name="medic" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все сотрудники</option>{% for medic in medics %}<option value="{{ medic.telegram_id }}"{% if medic.telegram_id == selected_medic_id %} selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label>
+<div class="filter-buttons"><button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>Найти</button></div>
+</div>
+<details class="filter-more"{% if selected_city or selected_hospital or selected_doctor %} open{% endif %}>
+<summary><svg class="icon" aria-hidden="true"><use href="#i-filter"/></svg>Ещё фильтры: город, роддом, врач<span class="chev"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></span></summary>
 <div class="form-grid">
-<label class="field"><span>Город</span><select name="city" onchange="this.form.elements.hospital.value='';this.form.elements.doctor.value='';this.form.submit()"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}"{% if item == selected_city %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
-<label class="field"><span>Роддом</span><select name="hospital" onchange="this.form.elements.doctor.value='';this.form.submit()"><option value="">{% if selected_city %}Все роддома{% else %}Сначала город{% endif %}</option>{% for item in hospitals %}<option value="{{ item }}"{% if item == selected_hospital %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
-<label class="field"><span>Врач</span><select name="doctor"><option value="">Все врачи</option>{% for group in doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}"{% if doctor == selected_doctor %} selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
-<label class="field"><span>Медик</span><select name="medic"><option value="">Все медики</option>{% for medic in medics %}<option value="{{ medic.telegram_id }}"{% if medic.telegram_id == selected_medic_id %} selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label>
-<label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ selected_date_from }}"></label>
-<label class="field"><span>По дату</span><input type="date" name="date_to" value="{{ selected_date_to }}"></label>
-</div>
-<div class="form-actions">
-<button type="submit">Применить</button>
-{% if has_filters %}<a class="btn btn-ghost" href="{% url 'dashboard' %}{% if selected_decision %}?decision={{ selected_decision }}{% endif %}">Сбросить все</a>{% endif %}
-<button type="submit" class="btn-secondary push-right" formaction="{% url 'export_photos' %}"><svg class="icon"><use href="#i-download"/></svg>Excel по этим фильтрам</button>
-</div>
+<label class="field"><span>Город</span><select name="city" onchange="this.form.elements.hospital.value='';this.form.elements.doctor.value='';this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}"{% if item == selected_city %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label class="field"><span>Роддом</span><select name="hospital" onchange="this.form.elements.doctor.value='';this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">{% if selected_city %}Все роддома{% else %}Сначала выберите город{% endif %}</option>{% for item in hospitals %}<option value="{{ item }}"{% if item == selected_hospital %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label class="field"><span>Врач</span><select name="doctor" onchange="this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все врачи</option>{% for group in doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}"{% if doctor == selected_doctor %} selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
 </div>
 </details>
-{% if filter_chips %}<div class="chips" aria-label="Выбранные фильтры">{% for chip in filter_chips %}<a class="chip" href="?{{ chip.remove_query }}" title="Убрать фильтр"><span class="chip-title">{{ chip.title }}:</span> {{ chip.value }}<svg class="icon"><use href="#i-x"/></svg></a>{% endfor %}</div>{% endif %}
+{% if filter_chips %}<div class="chips" aria-label="Выбранные фильтры">{% for chip in filter_chips %}<a class="chip" href="?{{ chip.remove_query }}" title="Убрать фильтр"><span class="chip-title">{{ chip.title }}:</span> {{ chip.value }}<svg class="icon"><use href="#i-x"/></svg></a>{% endfor %}<a class="chip chip-reset" href="{% url 'dashboard' %}{% if selected_decision %}?decision={{ selected_decision }}{% endif %}">Сбросить все</a></div>{% endif %}
 </form>
 
 <div class="toolbar">
@@ -52,12 +64,12 @@
 </div>
 <form class="toolbar-controls" method="get">
 {% for key, value in request.GET.items %}{% if key != 'sort' and key != 'page' and key != 'group' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
-<label class="select-inline"><svg class="icon"><use href="#i-sort"/></svg><span class="sr-only">Сортировка</span><select name="sort" onchange="this.form.submit()">{% for key, label in photo_sorts.items %}<option value="{{ key }}"{% if key == selected_sort %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-<label class="select-inline"><span class="sr-only">Группировка</span><select name="group" onchange="this.form.submit()"><option value="flag"{% if group_by_flag %} selected{% endif %}>Группы по проверке</option><option value="none"{% if not group_by_flag %} selected{% endif %}>Без групп</option></select></label>
+<label class="select-inline"><svg class="icon"><use href="#i-sort"/></svg><span class="sr-only">Сортировка</span><select name="sort" onchange="this.form.requestSubmit?this.form.requestSubmit():this.form.submit()">{% for key, label in photo_sorts.items %}<option value="{{ key }}"{% if key == selected_sort %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label class="select-inline"><span class="sr-only">Группировка</span><select name="group" onchange="this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="flag"{% if group_by_flag %} selected{% endif %}>Группы по проверке</option><option value="none"{% if not group_by_flag %} selected{% endif %}>Без групп</option></select></label>
 <noscript><button type="submit" class="btn-secondary btn-sm">Применить</button></noscript>
 <div class="segmented" role="group" aria-label="Вид списка">
-<button type="button" class="seg" data-photo-view="grid" title="Плиткой" aria-label="Плиткой"><svg class="icon"><use href="#i-grid"/></svg></button>
 <button type="button" class="seg" data-photo-view="list" title="Списком" aria-label="Списком"><svg class="icon"><use href="#i-list"/></svg></button>
+<button type="button" class="seg" data-photo-view="grid" title="Плиткой" aria-label="Плиткой"><svg class="icon"><use href="#i-grid"/></svg></button>
 </div>
 </form>
 </div>

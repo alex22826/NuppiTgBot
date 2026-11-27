@@ -35,7 +35,15 @@ def chat_history(request):
                       COALESCE(NULLIF(TRIM(u.username), ''),
                                NULLIF(TRIM(MAX(cm.username)), ''), '') AS username,
                       COUNT(*) AS message_count,
-                      MAX(cm.created_at) AS last_message_at
+                      MAX(cm.created_at) AS last_message_at,
+                      (SELECT last.text FROM chat_messages AS last
+                       WHERE last.telegram_id = cm.telegram_id
+                       ORDER BY julianday(last.created_at) DESC, last.id DESC
+                       LIMIT 1) AS last_text,
+                      (SELECT last.direction FROM chat_messages AS last
+                       WHERE last.telegram_id = cm.telegram_id
+                       ORDER BY julianday(last.created_at) DESC, last.id DESC
+                       LIMIT 1) AS last_direction
                FROM chat_messages AS cm
                LEFT JOIN users AS u ON u.telegram_id = cm.telegram_id
                GROUP BY cm.telegram_id, u.full_name, u.username
@@ -87,8 +95,12 @@ def chat_history(request):
         "contact": "Контакт",
         "service": "Служебное сообщение",
     }
+    for conversation in conversations:
+        conversation["last_message_display"] = format_sent_at(conversation["last_message_at"])
     for item in chat_messages:
         item["created_at_display"] = format_sent_at(item["created_at"])
+        item["day_display"] = item["created_at_display"][:10]
+        item["time_display"] = item["created_at_display"][11:]
         item["type_label"] = type_labels.get(item["message_type"], item["message_type"])
     selected_conversation = next(
         (

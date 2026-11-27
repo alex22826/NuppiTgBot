@@ -32,8 +32,17 @@ from ..text import (
 @login_required
 def reports_page(request):
     """Все выгрузки Excel и статистика медиков на одной странице."""
+    from ..periods import full_report_period
     from .photos import photo_list_context
 
+    # Без выбранного периода отчёты открываются за последние 10 дней — как и
+    # сам полный отчёт, — чтобы цифры на странице совпадали с файлом.
+    if not request.GET.get("date_from") and not request.GET.get("date_to"):
+        _, default_from, default_to = full_report_period()
+        query = request.GET.copy()
+        query["date_from"] = default_from.isoformat()
+        query["date_to"] = default_to.isoformat()
+        request.GET = query
     return render(request, "dashboard/reports.html", photo_list_context(request))
 
 

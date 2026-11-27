@@ -1,24 +1,30 @@
-<article class="photo-card flag-{{ card_class|default:'clear' }}" data-photo-card>
+<article class="photo-card flag-{{ card_class|default:'clear' }}" data-photo-card data-photo-id="{{ photo.id }}" data-detail-url="{% url 'photo_detail' photo.id %}" data-image-url="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1">
 <div class="photo-thumb">
-<a class="photo-viewer-link" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фото {{ photo.id }}" loading="lazy" decoding="async"></a>
-<a class="photo-number" href="{% url 'photo_detail' photo.id %}" title="Открыть страницу фотографии">№{{ photo.id }}</a>
+<a class="photo-viewer-link" data-photo-open href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener" title="Открыть фото и данные"><img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фото {{ photo.id }}" loading="lazy" decoding="async"></a>
+<span class="photo-number">№{{ photo.id }}</span>
 <span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span>
+<span class="thumb-hint" aria-hidden="true"><svg class="icon"><use href="#i-expand"/></svg></span>
 </div>
 <div class="photo-body">
-<div>
-<div class="photo-title">{{ photo.doctor_name|default:'Врач не указан' }}</div>
+<div class="pc-main">
+<a class="photo-title" data-photo-open href="{% url 'photo_detail' photo.id %}">{{ photo.doctor_name|default:'Врач не указан' }}</a>
 <div class="photo-sub"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>{{ photo.city }} · {{ photo.maternity_hospital }}</div>
-</div>
 <ul class="photo-meta">
 <li><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span>Медик: <b>{{ photo.sender_name }}</b></span></li>
 <li><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><span>Отправлено: {{ photo.sent_at_display }}</span></li>
 <li class="photo-qr-data"><svg class="icon" aria-hidden="true"><use href="#i-qr"/></svg><span>Номер QR/Data Matrix: <b><span>{{ photo.qr_data|default:'—' }}</span></b></span></li>
 </ul>
+</div>
+<div class="pc-check">
 <div class="flag"><div><b>{{ photo.review_status|default:'Не проверено' }}</b><br><span class="photo-code-status"><span>{{ photo.code_status|default:"Код: нет данных" }}</span></span></div></div>
 {% if photo.manual_reason %}<p class="operator-comment">{{ photo.manual_reason }}</p>{% endif %}
+<a class="btn btn-ghost btn-sm pc-open" data-photo-open href="{% url 'photo_detail' photo.id %}"><svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg>Открыть фото и все данные</a>
+</div>
+<div class="pc-actions">
 {% include 'dashboard/photo_decision_form.html' with photo=photo %}
+</div>
 <details class="more">
-<summary>Подробнее, правка и удаление<span class="chev"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></span></summary>
+<summary>Все проверки, правка и удаление<span class="chev"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></span></summary>
 <div class="more-body">
 <div class="more-block">
 <h4>Данные</h4>
@@ -48,8 +54,7 @@
 {% include 'dashboard/photo_edit_form.html' with photo=photo %}
 </div>
 <div class="btn-row">
-<a class="btn btn-secondary btn-sm" href="{% url 'photo_image' photo.id %}?download=1"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать фото</a>
-<a class="btn btn-secondary btn-sm" href="{% url 'photo_detail' photo.id %}"><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>Открыть</a>
+<a class="btn btn-secondary btn-sm" href="{% url 'photo_image' photo.id %}?download=1"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать оригинал</a>
 {% include 'dashboard/photo_original_link.html' with photo=photo %}
 <form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to|default:request.get_full_path }}"><button class="btn-danger-outline btn-sm"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить фото</button></form>
 </div>

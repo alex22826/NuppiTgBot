@@ -23,7 +23,6 @@ from io import BytesIO
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
-REPO_URL = f"https://github.com/{os.getenv('GITHUB_REPOSITORY', 'alex22826/NuppiTgBot')}"
 
 MEDICS = [
     (1001, "Каримова Дилноза", "Ташкент", ["Роддом №1", "Роддом №4"]),
@@ -53,20 +52,17 @@ FONT_CANDIDATES = [
     "C:/Windows/Fonts/arial.ttf",
 ]
 
-DEMO_BANNER = (
-    '<div class="demo-banner" style="background:#fff4d6;border-bottom:1px solid #e5c76b;'
-    'padding:8px 16px;font:14px/1.4 system-ui,sans-serif;color:#5a4500">'
-    "Демо-версия панели на выдуманных данных. Кнопки и формы здесь не работают — "
-    f'настоящий сайт запускается по <a href="{REPO_URL}#readme">инструкции в README</a>.'
-    "</div>"
-)
-# Перехватываем отправку форм раньше скриптов сайта; выгрузки Excel оставляем рабочими.
+# Демо без сервера: решения и правки фото сохраняются только на странице
+# (window.NUPPI_DEMO), выгрузки Excel скачиваются, остальные формы показывают
+# короткое уведомление вместо перехода на несуществующий адрес.
 DEMO_SCRIPT = (
-    "<script>window.addEventListener('submit',function(e){"
-    "var t=(e.submitter&&e.submitter.getAttribute('formaction'))||e.target.getAttribute('action')||'';"
+    "<script>window.NUPPI_DEMO=true;"
+    "window.addEventListener('submit',function(e){"
+    "var f=e.target;if(f.closest('.decision-form,.photo-edit-form'))return;"
+    "var t=(e.submitter&&e.submitter.getAttribute('formaction'))||f.getAttribute('action')||'';"
     "if(/\\.xlsx$/.test(t))return;"
     "e.preventDefault();e.stopImmediatePropagation();"
-    "alert('Это демо-версия: действия отключены.');},true);</script>"
+    "if(window.nuppiToast)window.nuppiToast('В демо-версии эта функция недоступна.','info');},true);</script>"
 )
 
 
@@ -205,6 +201,10 @@ class SiteSnapshot:
             if response.status_code != 200 or f"?page={number - 1}" not in response.content.decode():
                 break
             self.paged[str(number)] = f"index-{number}.html"
+        # У каждого диалога переписки своя страница.
+        self.chats = {}
+        for telegram_id in sorted(set(re.findall(r'\?telegram_id=(-?\d+)', client.get("/chats/").content.decode()))):
+            self.chats[telegram_id] = f"chats-{telegram_id}.html"
         for photo_id in photo_ids:
             self.pages[f"/photo/{photo_id}/view/"] = f"photo/{photo_id}.html"
             # Страница «оригинала» есть только у фото, помеченных как копия.
@@ -228,14 +228,22 @@ class SiteSnapshot:
     def relative(target: str, page: str) -> str:
         return "../" * page.count("/") + target
 
-    def static_target(self, url: str) -> str:
+    def static_target(self, url: str, source: str = "/") -> str:
         url, hash_mark, fragment = url.partition("#")
-        target = self._static_target(url)
+        target = self._static_target(url, source)
         return f"{target}#{fragment}" if hash_mark and target != "#" else target
 
-    def _static_target(self, url: str) -> str:
+    def _static_target(self, url: str, source: str) -> str:
         path, _, query = url.partition("?")
-        if path in ("", "/"):
+        if path == "":
+            path = source
+        query = query.replace("&amp;", "&")
+        if path == "/chats/":
+            chat_match = re.match(r"telegram_id=(-?\d+)", query)
+            if chat_match and chat_match.group(1) in self.chats:
+                return self.chats[chat_match.group(1)]
+            return "chats.html"
+        if path == "/":
             page_match = re.fullmatch(r"page=(\d+)", query)
             if page_match:
                 return self.paged.get(page_match.group(1), "index.html")
@@ -244,7 +252,8 @@ class SiteSnapshot:
                 return self.filters[decision_match.group(1)]
             return "index.html"
         if path.startswith("/static/"):
-            return path[1:]
+            # Метка версии (?v=…) нужна, чтобы браузер не показывал старые стили.
+            return path[1:] + (f"?{query}" if query else "")
         if path in self.files:
             return self.files[path]
         if path in self.pages:
@@ -254,15 +263,14 @@ class SiteSnapshot:
         # Остальные адреса работают только на сервере: ведём на главную.
         return "index.html"
 
-    def rewrite(self, html: str, page: str) -> str:
+    def rewrite(self, html: str, page: str, source: str = "/") -> str:
         def replace(match):
-            target = self.static_target(match.group(2))
+            target = self.static_target(match.group(2), source)
             if target != "#":
                 target = self.relative(target, page)
             return f'{match.group(1)}="{target}"'
 
         html = re.sub(r'(href|src|action|formaction|data-[a-z-]+)="([/?][^"]*)"', replace, html)
-        html = re.sub(r"<body([^>]*)>", lambda m: f"<body{m.group(1)}>{DEMO_BANNER}", html, count=1)
         html = html.replace("</body>", f"{DEMO_SCRIPT}</body>")
         return re.sub(r'<input type="hidden" name="csrfmiddlewaretoken"[^>]*>', "", html)
 
@@ -270,10 +278,12 @@ class SiteSnapshot:
         html_pages = dict(self.pages)
         html_pages.update({f"/?decision={value}": page for value, page in self.filters.items()})
         html_pages.update({f"/?page={number}": page for number, page in self.paged.items()})
+        html_pages.update({f"/chats/?telegram_id={key}": page for key, page in self.chats.items()})
         for url, page in html_pages.items():
             target = out / page
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(self.rewrite(self.fetch(url).content.decode(), page), encoding="utf-8")
+            source = url.partition("?")[0]
+            target.write_text(self.rewrite(self.fetch(url).content.decode(), page, source), encoding="utf-8")
         for url, name in self.files.items():
             target = out / name
             target.parent.mkdir(parents=True, exist_ok=True)

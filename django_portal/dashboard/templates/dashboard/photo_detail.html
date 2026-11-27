@@ -13,7 +13,7 @@
 <a class="photo-viewer-link" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фотография №{{ photo.id }}" decoding="async"></a>
 <p class="hint">Нажмите на фото, чтобы открыть его крупно, повернуть или увеличить.</p>
 </div>
-<div class="detail-side flag-{{ review_group|default:'clear' }}" data-photo-card>
+<div class="detail-side flag-{{ review_group|default:"clear" }}" data-photo-card data-photo-id="{{ photo.id }}">
 <section class="panel">
 <div class="panel-head"><h2>Итог проверки</h2><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span></div>
 <div class="flag" style="margin-bottom:14px"><div><b>{{ photo.review_status|default:'Не проверено' }}</b><br><span class="photo-code-status"><span>{{ photo.code_status|default:"Код: нет данных" }}</span></span>{% if photo.review_reason %}<br>{{ photo.review_reason }}{% endif %}</div></div>
