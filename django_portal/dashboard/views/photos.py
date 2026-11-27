@@ -5,13 +5,21 @@ import sqlite3
 from datetime import datetime, timedelta
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from ..access import creator_required, is_creator
+from .. import audit
+from ..access import (
+    has_perm,
+    is_creator,
+    permission_required,
+    photo_in_scope,
+    region_allowed,
+    region_condition,
+    user_regions,
+)
 from ..catalog import (
     build_doctor_groups,
     build_doctor_options,
@@ -62,7 +70,7 @@ from .common import return_to_photo_list
 PHOTO_PAGE_SIZE = 20
 
 
-@login_required
+@permission_required("photos.view")
 def dashboard(request):
     """Фотографии с вкладками по итогу проверки и фильтрами."""
     return render(request, "dashboard/dashboard.html", photo_list_context(request))
@@ -109,6 +117,9 @@ def active_filter_chips(request, labels):
 def photo_list_context(request):
     """Фильтры, счётчики и страница фото — общие для «Фотографий» и «Отчётов»."""
     creator_view = is_creator(request.user)
+    # Руководитель видит только свои регионы: фото, счётчики, списки и выгрузки.
+    allowed_regions = user_regions(request.user)
+    region_sql, region_params = region_condition(allowed_regions)
     connection = bot_database()
     if not connection:
         return {
@@ -144,9 +155,12 @@ def photo_list_context(request):
             hospital = resolve_hospital_name(city, hospital, hospital_renames)
         assigned_hospital_rows = catalog["assigned_hospital_rows"]
         cities = sorted(
-            {row["city"] for row in assigned_hospital_rows if row["city"]},
+            {row["city"] for row in assigned_hospital_rows
+             if row["city"] and region_allowed(allowed_regions, row["city"])},
             key=str.casefold,
         )
+        if city and not region_allowed(allowed_regions, city):
+            city, hospital = "", ""
         hospitals = set()
         if city:
             hospitals.update(
@@ -177,6 +191,8 @@ def photo_list_context(request):
             decision_reason = f"COALESCE(NULLIF(checks.manual_reason, ''), checks.decision_reason, {review_reason}, '')"
             manual_decision = "NULLIF(checks.manual_decision, '')"
             manual_reason = "COALESCE(checks.manual_reason, '')"
+            manual_reviewer = "COALESCE(checks.manual_reviewer, '')"
+            manual_at = "checks.manual_at"
             product_status = "COALESCE(checks.product_status, 'Не проверено')"
             material_status = "COALESCE(checks.material_status, 'Не проверено')"
             location_status = "COALESCE(checks.location_status, 'Не запрашивалась')"
@@ -189,6 +205,8 @@ def photo_list_context(request):
             decision_reason = review_reason
             manual_decision = "NULL"
             manual_reason = "''"
+            manual_reviewer = "''"
+            manual_at = "NULL"
             product_status = material_status = duplicate_status = editing_status = "'Не проверено'"
             location_status = "'Не запрашивалась'"
             assignment_status = "'Задание не назначено'"
@@ -212,6 +230,8 @@ def photo_list_context(request):
                    {decision_reason} AS decision_reason,
                    {manual_decision} AS manual_decision,
                    {manual_reason} AS manual_reason,
+                   {manual_reviewer} AS manual_reviewer,
+                   {manual_at} AS manual_at,
                    {product_status} AS product_status,
                    {material_status} AS material_status,
                    {location_status} AS location_status,
@@ -227,6 +247,9 @@ def photo_list_context(request):
         # Город, роддом, врач и медик ограничивают все счётчики. Период
         # дополнительно применяется к списку, статистике и счётчику периода.
         scope_conditions, scope_parameters = [], []
+        if region_sql:
+            scope_conditions.append(region_sql)
+            scope_parameters.extend(region_params)
         if city:
             scope_conditions.append("sender.city = ?")
             scope_parameters.append(city)
@@ -249,11 +272,13 @@ def photo_list_context(request):
         ).fetchall()
         if scope_conditions:
             report_medic_options = connection.execute(
-                """SELECT DISTINCT p.sender_telegram_id AS telegram_id,
+                f"""SELECT DISTINCT p.sender_telegram_id AS telegram_id,
                           COALESCE(sender.full_name, 'Пользователь удалён') AS full_name
                    FROM photos AS p
                    LEFT JOIN users AS sender ON sender.telegram_id = p.sender_telegram_id
-                   ORDER BY full_name COLLATE NOCASE"""
+                   {('WHERE ' + region_sql) if region_sql else ''}
+                   ORDER BY full_name COLLATE NOCASE""",
+                region_params,
             ).fetchall()
         else:
             report_medic_options = medic_options
@@ -358,6 +383,10 @@ def photo_list_context(request):
         # Это именно число зарегистрированных активных медиков, а не только тех,
         # кто уже успел отправить фото. При выборе роддома учитываются назначения.
         medic_where, medic_parameters = ["u.role = 'Медик'"], []
+        users_region_sql, users_region_params = region_condition(allowed_regions, "u.city")
+        if users_region_sql:
+            medic_where.append(users_region_sql)
+            medic_parameters.extend(users_region_params)
         if active_column:
             medic_where.append("u.is_active = 1")
         if city:
@@ -391,6 +420,7 @@ def photo_list_context(request):
         photo["decision_label"] = DECISION_LABELS.get(photo["decision"], "На проверке")
         photo["manual_decision_label"] = DECISION_LABELS.get(photo["manual_decision"], "")
         photo["review_group"] = photo_review_group(photo)
+        photo["manual_at_display"] = format_sent_at(photo["manual_at"]) if photo["manual_at"] else ""
         photo_groups[photo["review_group"]].append(photo)
 
     medic_names = {str(row["telegram_id"]): row["full_name"] for row in medic_options}
@@ -460,7 +490,7 @@ def photo_list_context(request):
     }
 
 
-@login_required
+@permission_required("photos.view")
 def photo_lookup(request):
     """Open a photo card by the numeric ID shown on the operator site."""
     raw_photo_id = request.GET.get("photo_id", "")
@@ -483,7 +513,7 @@ def photo_lookup(request):
     try:
         exists = connection.execute(
             "SELECT 1 FROM photos WHERE id = ?", (photo_id,),
-        ).fetchone()
+        ).fetchone() and photo_in_scope(connection, request.user, photo_id)
     finally:
         connection.close()
     if not exists:
@@ -495,32 +525,42 @@ def photo_lookup(request):
     return redirect("photo_detail", photo_id=photo_id)
 
 
-@login_required
+@permission_required("photos.view")
 def photo_detail(request, photo_id):
     """Show one complete photo card without dashboard filters or pagination."""
     connection = bot_database()
     if not connection:
         raise Http404
     try:
+        if not photo_in_scope(connection, request.user, photo_id):
+            raise Http404
         photo = photo_details_for_operator(connection, photo_id)
     finally:
         connection.close()
     if not photo:
         raise Http404
+    from ..models import AuditEvent
+
+    history = list(AuditEvent.objects.filter(object_type="photo", object_id=str(photo_id))[:30])
+    for event in history:
+        event.action_label = audit.action_label(event.action)
     return render(request, "dashboard/photo_detail.html", {
         "photo": photo,
+        "history": history,
         "review_group": photo_review_group(photo),
         "return_to": request.get_full_path(),
         "is_creator": is_creator(request.user),
     })
 
 
-@login_required
+@permission_required("photos.view")
 def photo_original(request, photo_id):
     connection = bot_database()
     if not connection:
         raise Http404
     try:
+        if not photo_in_scope(connection, request.user, photo_id):
+            raise Http404
         photo = photo_details(connection, photo_id)
         if not photo or not is_copy_or_crop_status(photo["review_status"]):
             raise Http404
@@ -532,7 +572,7 @@ def photo_original(request, photo_id):
     })
 
 
-@login_required
+@permission_required("photos.view")
 def photo_image(request, photo_id):
     connection = bot_database()
     if not connection:
@@ -540,6 +580,9 @@ def photo_image(request, photo_id):
     thumbnail_requested = request.GET.get("thumbnail") == "1"
     try:
         with connection:
+            # Руководителю доступны фото своих регионов и оригиналы для их копий.
+            if not photo_in_scope(connection, request.user, photo_id, allow_originals=True):
+                raise Http404
             try:
                 photo_identity = connection.execute(
                     "SELECT image_digest FROM photos WHERE id = ?", (photo_id,),
@@ -592,7 +635,7 @@ def photo_image(request, photo_id):
     return response
 
 
-@login_required
+@permission_required("photos.edit")
 @require_POST
 def edit_photo_metadata(request, photo_id):
     """Save operator metadata without erasing a confirmed visual duplicate."""
@@ -635,6 +678,8 @@ def edit_photo_metadata(request, photo_id):
             return return_to_photo_list(request)
         photo = connection.execute(
             """SELECT p.review_status, p.review_reason, p.original_photo_id,
+                      p.photo_date AS old_photo_date, p.mother_name AS old_mother_name,
+                      p.qr_data AS old_qr_data,
                       COALESCE(
                           (SELECT eh.city
                            FROM employee_hospitals AS eh
@@ -650,7 +695,7 @@ def edit_photo_metadata(request, photo_id):
                WHERE p.id = ?""",
             (photo_id,),
         ).fetchone()
-        if not photo:
+        if not photo or not photo_in_scope(connection, request.user, photo_id):
             if wants_json:
                 return JsonResponse({"ok": False, "error": "Фотография не найдена."}, status=404)
             raise Http404
@@ -756,6 +801,23 @@ def edit_photo_metadata(request, photo_id):
     message = "Дата, ФИО и QR/Data Matrix сохранены."
     if duplicate:
         message += " Обнаружена копия по разрешённому правилу."
+    changes = {}
+    for field, label, old, new in (
+        ("photo_date", "дата", photo["old_photo_date"], photo_date or None),
+        ("mother_name", "ФИО", photo["old_mother_name"], mother_name or None),
+        ("qr_data", "QR", photo["old_qr_data"], qr_data),
+    ):
+        if (old or None) != (new or None):
+            changes[field] = {"label": label, "old": old or "", "new": new or ""}
+    if changes:
+        audit.record(
+            request, "photo_edit",
+            f"Фото №{photo_id}: изменено — " + ", ".join(
+                f"{item['label']} «{item['old'] or '—'}» → «{item['new'] or '—'}»" for item in changes.values()
+            ),
+            object_type="photo", object_id=photo_id, changes=changes,
+            duplicate_of=original_photo_id if duplicate else None,
+        )
     if wants_json:
         return JsonResponse({
             "ok": True,
@@ -773,10 +835,10 @@ def edit_photo_metadata(request, photo_id):
     return return_to_photo_list(request)
 
 
-@login_required
+@permission_required("photos.decide")
 @require_POST
 def set_photo_decision(request, photo_id):
-    """Let any authenticated site operator save a human decision."""
+    """Ручное решение оператора; отклонять могут только роли с этим правом."""
     wants_json = (
         request.headers.get("x-requested-with") == "XMLHttpRequest"
         or "application/json" in request.headers.get("accept", "")
@@ -790,6 +852,12 @@ def set_photo_decision(request, photo_id):
                 status=400,
             )
         messages.error(request, "Выберите корректный итог проверки фотографии.")
+        return return_to_photo_list(request)
+    if decision == DECISION_REJECTED and not has_perm(request.user, "photos.reject"):
+        error = "Вашей роли нельзя отклонять фотографии."
+        if wants_json:
+            return JsonResponse({"ok": False, "error": error}, status=403)
+        messages.error(request, error)
         return return_to_photo_list(request)
     if decision == DECISION_REJECTED and not reason:
         if wants_json:
@@ -815,7 +883,7 @@ def set_photo_decision(request, photo_id):
             "FROM photos WHERE id = ?",
             (photo_id,),
         ).fetchone()
-        if not photo:
+        if not photo or not photo_in_scope(connection, request.user, photo_id):
             raise Http404
         ensure_photo_checks_table(connection)
         automatic = automatic_photo_decision(
@@ -853,6 +921,13 @@ def set_photo_decision(request, photo_id):
                WHERE photo_id = ?""",
             (decision, reason, request.user.username, timezone.now().isoformat(), photo_id),
         )
+    summary = f"Фото №{photo_id}: {DECISION_LABELS[previous_decision]} → {DECISION_LABELS[decision]}"
+    if reason:
+        summary += f". Причина: {reason}"
+    audit.record(
+        request, "photo_decision", summary, object_type="photo", object_id=photo_id,
+        decision=decision, previous_decision=previous_decision, reason=reason,
+    )
     if wants_json:
         return JsonResponse(
             {
@@ -868,7 +943,7 @@ def set_photo_decision(request, photo_id):
     return return_to_photo_list(request)
 
 
-@login_required
+@permission_required("photos.delete")
 @require_POST
 def delete_photo(request, photo_id):
     """Полностью удаляет одну фотографию и её данные из базы бота."""
@@ -876,16 +951,33 @@ def delete_photo(request, photo_id):
     if not connection:
         raise Http404
     with connection:
+        if not photo_in_scope(connection, request.user, photo_id):
+            raise Http404
+        info = connection.execute(
+            """SELECT p.sent_at, p.doctor_name, COALESCE(sender.full_name, '') AS sender_name
+               FROM photos AS p LEFT JOIN users AS sender ON sender.telegram_id = p.sender_telegram_id
+               WHERE p.id = ?""",
+            (photo_id,),
+        ).fetchone()
         if database_table_exists(connection, "photo_checks"):
             connection.execute("DELETE FROM photo_checks WHERE photo_id = ?", (photo_id,))
         result = connection.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
     if not result.rowcount:
         raise Http404
+    audit.record(
+        request, "photo_delete",
+        f"Удалено фото №{photo_id}" + (
+            f" ({info['sender_name'] or 'отправитель неизвестен'}, {format_sent_at(info['sent_at'])})" if info else ""
+        ),
+        object_type="photo", object_id=photo_id,
+        sender=info["sender_name"] if info else "", doctor=info["doctor_name"] if info else "",
+        sent_at=info["sent_at"] if info else "",
+    )
     messages.success(request, "Фотография полностью удалена из базы.")
     return return_to_photo_list(request)
 
 
-@creator_required
+@permission_required("photos.delete")
 @require_POST
 def delete_filtered_photos(request):
     """Удаляет фото только при совпадении сотрудника, роддома и локальной даты отправки."""
@@ -930,6 +1022,12 @@ def delete_filtered_photos(request):
         ).rowcount
 
     display_date = datetime.strptime(sent_date, "%Y-%m-%d").strftime("%d.%m.%Y")
+    audit.record(
+        request, "photos_bulk_delete",
+        f"Удалено фото: {deleted_count}. Сотрудник: {employee['full_name']}; роддом: {hospital}; дата: {display_date}",
+        object_type="employee", object_id=telegram_id,
+        deleted=deleted_count, city=city, hospital=hospital, sent_date=sent_date,
+    )
     messages.success(
         request,
         f"Удалено фотографий: {deleted_count}. Сотрудник: {employee['full_name']}; "

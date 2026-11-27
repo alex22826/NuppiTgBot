@@ -44,5 +44,8 @@ urlpatterns = [
     path("users/<int:telegram_id>/delete/", views.delete_employee, name="delete_employee"),
     path("employees/add/", views.add_employee, name="add_employee"),
     path("employees/<int:telegram_id>/edit/", views.edit_employee, name="edit_employee"),
-    path("site-operators/add/", views.add_site_operator, name="add_site_operator"),
+    path("users/", views.users_list, name="users"),
+    path("users/add/", views.user_add, name="user_add"),
+    path("users/<int:user_id>/", views.user_edit, name="user_edit"),
+    path("journal/", views.journal, name="journal"),
 ]

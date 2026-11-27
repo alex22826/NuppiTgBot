@@ -56,7 +56,7 @@
 <div class="btn-row">
 <a class="btn btn-secondary btn-sm" href="{% url 'photo_image' photo.id %}?download=1"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать оригинал</a>
 {% include 'dashboard/photo_original_link.html' with photo=photo %}
-<form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to|default:request.get_full_path }}"><button class="btn-danger-outline btn-sm"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить фото</button></form>
+{% if 'photos.delete' in nav.perms %}<form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to|default:request.get_full_path }}"><button class="btn-danger-outline btn-sm"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить фото</button></form>{% endif %}
 </div>
 </div>
 </details>

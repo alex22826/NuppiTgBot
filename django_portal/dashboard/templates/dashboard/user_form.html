@@ -1,0 +1,18 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ target.username }} — Nuppi{% endblock %}
+{% block crumbs %}<a href="{% url 'users' %}">Пользователи и роли</a><span>{{ target.username }}</span>{% endblock %}
+{% block content %}
+<div class="page-head"><div class="person person-lg"><span class="avatar" data-avatar="{{ target.username }}">{{ target.username|slice:":1"|upper }}</span><div><h1>{{ profile.full_name|default:target.username }}</h1><p>Логин {{ target.username }} · {% if target.last_login %}последний вход {{ target.last_login|date:"d.m.Y H:i" }}{% else %}ещё не входил{% endif %}{% if 'audit.view' in nav.perms %} · <a href="{% url 'journal' %}?user={{ target.username|urlencode }}">действия в журнале</a>{% endif %}</p></div></div></div>
+<form class="panel" method="post" style="max-width:820px">{% csrf_token %}
+<div class="form-grid">
+<label class="field"><span>ФИО</span><input name="full_name" value="{{ profile.full_name }}"></label>
+<label class="field"><span>Роль</span><select name="role">{% for code, label in assignable %}<option value="{{ code }}"{% if code == role %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label class="field span-2"><span>Регионы (через запятую, пусто — все)</span><input name="regions" value="{{ profile.regions }}" list="known-regions" placeholder="Например: Ташкент, Самарканд"></label>
+<label class="field"><span>Новый пароль (если нужно сменить)</span><input name="password" type="password" autocomplete="new-password" placeholder="Оставьте пустым, чтобы не менять"></label>
+<label class="field-check full"><input type="checkbox" name="is_active"{% if target.is_active %} checked{% endif %}> Вход на сайт разрешён</label>
+</div>
+<p class="hint" style="margin-top:12px">Регионы действуют для ролей «Руководитель» и «Оператор проверки фото»: они видят фото, отчёты и переписку только этих городов. Владелец и администратор всегда видят всё.</p>
+<div class="form-actions"><button>Сохранить</button><a class="btn btn-ghost" href="{% url 'users' %}">Отмена</a></div>
+</form>
+<datalist id="known-regions">{% for region in known_regions %}<option value="{{ region }}">{% endfor %}</datalist>
+{% endblock %}

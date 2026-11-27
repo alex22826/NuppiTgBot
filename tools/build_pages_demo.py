@@ -45,6 +45,11 @@ CHATS = [
     (1003, "incoming", "Добрый день! Можно добавить новый роддом?"),
     (1003, "outgoing", "Да, добавили «Областной перинатальный центр» в ваш список."),
 ]
+DEMO_TEAM = [
+    ("admin", "Администратор Демо", "admin", ""),
+    ("supervisor", "Руководитель Ташкента", "supervisor", "Ташкент"),
+    ("operator", "Оператор Проверки", "photo_operator", ""),
+]
 PALETTE = [(46, 125, 110), (52, 101, 164), (196, 120, 48), (140, 70, 120), (90, 110, 60), (170, 60, 60)]
 FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -193,6 +198,8 @@ class SiteSnapshot:
             "/reports/": "reports.html",
             "/management/": "management.html",
             "/chats/": "chats.html",
+            "/users/": "users.html",
+            "/journal/": "journal.html",
         }
         self.filters = {value: f"index-{value}.html" for value in ("review", "accepted", "rejected")}
         self.paged = {}
@@ -308,23 +315,41 @@ def main() -> None:
         import django
 
         django.setup()
+        from dashboard.models import StaffProfile
         from django.contrib.auth import get_user_model
         from django.core.management import call_command
         from django.test import Client
 
         call_command("migrate", verbosity=0)
-        admin = get_user_model().objects.create_superuser("demo", password=secrets.token_urlsafe(16))
-        client = Client()
-        client.force_login(admin)
-        # Решения оператора ставим через настоящую страницу, чтобы сошлись счётчики и отчёты.
-        for photo_id in photo_ids[: len(photo_ids) * 2 // 3]:
+        users = get_user_model().objects
+        admin = users.create_superuser("demo", password=secrets.token_urlsafe(16))
+        # Несколько выдуманных пользователей с разными ролями — для страниц
+        # «Пользователи и роли» и «Журнал действий».
+        team = {}
+        for username, full_name, role, regions in DEMO_TEAM:
+            user = users.create_user(username, password=secrets.token_urlsafe(16))
+            StaffProfile.objects.create(user=user, full_name=full_name, role=role, regions=regions)
+            team[username] = user
+        StaffProfile.objects.create(user=admin, full_name="Демо Владелец", role="owner")
+
+        def client_for(user):
+            client = Client()
+            client.force_login(user)
+            return client
+
+        reviewers = [client_for(team["operator"]), client_for(team["supervisor"]), client_for(admin)]
+        # Решения ставим через настоящую страницу, чтобы сошлись счётчики, отчёты и журнал.
+        for index, photo_id in enumerate(photo_ids[: len(photo_ids) * 2 // 3]):
+            reviewer = reviewers[index % len(reviewers)]
             if rnd.random() < 0.8:
-                client.post(f"/photo/{photo_id}/decision/", {"decision": "accepted"})
+                reviewer.post(f"/photo/{photo_id}/decision/", {"decision": "accepted"})
             else:
-                client.post(
+                reviewer.post(
                     f"/photo/{photo_id}/decision/",
                     {"decision": "rejected", "reason": "Не видно код на упаковке"},
                 )
+        client = client_for(admin)
+        client.get("/reports/full-last-10-days.xlsx")
         SiteSnapshot(client, photo_ids).save(out)
 
 

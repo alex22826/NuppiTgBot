@@ -1,9 +1,8 @@
 """История переписки пользователей с ботом."""
 
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
-from ..access import is_creator
+from ..access import is_creator, permission_required, region_condition, user_regions
 from ..db import bot_database, database_table_exists
 from ..periods import local_day_bounds, requested_day
 from ..text import format_sent_at
@@ -11,7 +10,7 @@ from ..text import format_sent_at
 CHAT_HISTORY_LIMIT = 300
 
 
-@login_required
+@permission_required("chats.view")
 def chat_history(request):
     """Show an authenticated operator a read-only Telegram chat history."""
     creator_view = is_creator(request.user)
@@ -27,8 +26,11 @@ def chat_history(request):
                 "chat_unavailable": True,
                 "is_creator": creator_view,
             })
+        # Руководитель видит переписку только сотрудников своих регионов.
+        region_sql, region_params = region_condition(user_regions(request.user), "u.city")
+        region_where = f"WHERE {region_sql}" if region_sql else ""
         conversations = [dict(row) for row in connection.execute(
-            """SELECT cm.telegram_id,
+            f"""SELECT cm.telegram_id,
                       COALESCE(NULLIF(TRIM(u.full_name), ''),
                                NULLIF(TRIM(MAX(cm.sender_name)), ''),
                                'Пользователь ' || cm.telegram_id) AS full_name,
@@ -46,11 +48,14 @@ def chat_history(request):
                        LIMIT 1) AS last_direction
                FROM chat_messages AS cm
                LEFT JOIN users AS u ON u.telegram_id = cm.telegram_id
+               {region_where}
                GROUP BY cm.telegram_id, u.full_name, u.username
-               ORDER BY julianday(last_message_at) DESC, cm.telegram_id"""
+               ORDER BY julianday(last_message_at) DESC, cm.telegram_id""",
+            region_params,
         )]
         requested_user = request.GET.get("telegram_id", "").strip()
-        if requested_user.lstrip("-").isdigit():
+        allowed_ids = {conversation["telegram_id"] for conversation in conversations}
+        if requested_user.lstrip("-").isdigit() and (not region_sql or int(requested_user) in allowed_ids):
             selected_telegram_id = int(requested_user)
         else:
             selected_telegram_id = conversations[0]["telegram_id"] if conversations else None

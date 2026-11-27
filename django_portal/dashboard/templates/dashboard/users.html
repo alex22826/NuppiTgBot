@@ -1,0 +1,57 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Пользователи и роли — Nuppi{% endblock %}
+{% block crumbs %}<span>Пользователи и роли</span>{% endblock %}
+{% block content %}
+<div class="page-head">
+<div>
+<h1>Пользователи и роли</h1>
+<p>Кто входит на сайт и что ему можно. Роль определяет разделы и действия, регионы ограничивают руководителя и оператора только их фото и отчётами.</p>
+</div>
+</div>
+
+<section class="panel" aria-labelledby="users-title">
+<div class="panel-head"><span class="section-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></span><div><h2 id="users-title">Пользователи сайта</h2><p>Изменить можно только тех, кому вы можете назначать роли. Себя и владельца из настроек изменить нельзя.</p></div></div>
+{% if assignable %}
+<details class="add-box"{% if not rows %} open{% endif %}>
+<summary class="btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Создать вход</summary>
+<form class="panel" method="post" action="{% url 'user_add' %}">{% csrf_token %}
+<div class="panel-head"><h3>Новый пользователь</h3></div>
+<div class="form-grid">
+<label class="field"><span>Логин</span><input name="username" autocomplete="off" minlength="3" required></label>
+<label class="field"><span>ФИО</span><input name="full_name" placeholder="Как подписывать в журнале"></label>
+<label class="field"><span>Пароль</span><input name="password" type="password" autocomplete="new-password" placeholder="Не короче 8 символов" required></label>
+<label class="field"><span>Роль</span><select name="role" data-role-select>{% for code, label in assignable %}<option value="{{ code }}"{% if code == 'photo_operator' %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label class="field span-2" data-regions-field><span>Регионы (через запятую, пусто — все)</span><input name="regions" list="known-regions" placeholder="Например: Ташкент, Самарканд"></label>
+</div>
+<div class="form-actions"><button><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>Создать вход</button></div>
+</form>
+</details>
+{% endif %}
+<div class="table-tools" data-table-filter="#users-table">
+<label class="search-box"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Поиск пользователя</span><input type="search" name="q" placeholder="Логин, ФИО или регион"></label>
+<label class="select-inline"><span class="sr-only">Роль</span><select name="role"><option value="">Все роли</option>{% for role in roles %}<option value="{{ role.code }}">{{ role.label }}</option>{% endfor %}</select></label>
+<span class="hint table-count" data-filter-count></span>
+</div>
+<div class="table-wrap"><table id="users-table" data-sortable>
+<thead><tr><th data-sort="text">Пользователь</th><th data-sort="text">Роль</th><th class="hide-sm" data-sort="text">Регионы</th><th class="hide-sm" data-sort="text">Последний вход</th><th data-sort="text">Вход</th><th></th></tr></thead>
+<tbody>{% for row in rows %}<tr data-filter-item data-role="{{ row.role }}"{% if not row.user.is_active %} class="row-off"{% endif %}>
+<td data-value="{{ row.user.username }}"><div class="person"><span class="avatar-sm" data-avatar="{{ row.user.username }}">{{ row.user.username|slice:":1"|upper }}</span><div><b>{{ row.full_name|default:row.user.username }}</b><small>{{ row.user.username }}{% if row.is_self %} · это вы{% endif %}</small></div></div></td>
+<td><span class="role-pill {{ row.role }}">{{ row.role_label }}</span>{% if row.is_owner_setting %}<small>из настроек сайта</small>{% endif %}</td>
+<td class="hide-sm">{% if not row.scoped %}<span class="hint">все</span>{% elif row.regions %}{{ row.regions|join:", " }}{% else %}<span class="hint">все</span>{% endif %}</td>
+<td class="hide-sm" data-value="{{ row.user.last_login|date:'Y-m-d H:i' }}">{% if row.user.last_login %}{{ row.user.last_login|date:"d.m.Y H:i" }}{% else %}<span class="hint">ещё не входил</span>{% endif %}</td>
+<td>{% if row.user.is_active %}<span class="tag on">Разрешён</span>{% else %}<span class="tag off">Закрыт</span>{% endif %}</td>
+<td><div class="cell-actions">{% if row.can_manage %}<a class="btn btn-secondary btn-sm" href="{% url 'user_edit' row.user.pk %}"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg><span class="btn-label">Изменить</span></a>{% else %}<span class="hint" title="Изменить нельзя"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg></span>{% endif %}</div></td>
+</tr>{% endfor %}</tbody>
+</table><p class="hint filter-empty" hidden style="padding:16px">Никого не найдено.</p></div>
+</section>
+
+<section class="panel" aria-labelledby="roles-title" style="margin-top:20px">
+<div class="panel-head"><span class="section-icon"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg></span><div><h2 id="roles-title">Что может каждая роль</h2><p>Права зашиты в роль: администратор выдаёт роль, а не собирает права вручную. Роли продаж (агент, экспедитор, склад, касса) появятся вместе с системой продаж.</p></div></div>
+<div class="role-cards">{% for role in roles %}<div class="role-card"><span class="role-pill {{ role.code }}">{{ role.label }}</span><p>{{ role.description }}</p>{% if role.scoped %}<small>Можно ограничить регионами</small>{% else %}<small>Все регионы</small>{% endif %}</div>{% endfor %}</div>
+<div class="table-wrap" style="margin-top:14px"><table class="perm-table">
+<thead><tr><th>Раздел</th><th>Право</th>{% for role in roles %}<th class="center">{{ role.label }}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in matrix %}<tr><td class="muted">{{ row.section }}</td><td>{{ row.title }}</td>{% for allowed in row.roles %}<td class="center">{% if allowed %}<span class="perm yes" title="Можно"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>{% else %}<span class="perm no" title="Нельзя">—</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+</section>
+<datalist id="known-regions">{% for region in known_regions %}<option value="{{ region }}">{% endfor %}</datalist>
+{% endblock %}

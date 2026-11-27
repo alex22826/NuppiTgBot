@@ -10,6 +10,7 @@ from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
+from .access import region_condition
 from .catalog import load_hospital_renames, resolve_hospital_name
 from .db import database_table_exists, photo_columns
 from .decision_rules import DECISION_REJECTED
@@ -21,7 +22,7 @@ from .text import doctor_search_condition, doctor_search_key, sent_at_local_date
 PHOTO_PAYMENT_RATE_SUM = int(os.getenv("PHOTO_PAYMENT_RATE_SUM", "100000"))
 
 
-def full_ten_day_report_data(connection, now=None, date_from=None, date_to=None):
+def full_ten_day_report_data(connection, now=None, date_from=None, date_to=None, regions=None):
     """Сводные данные за выбранный период; по умолчанию — последние десять дней."""
     local_timezone = timezone.get_default_timezone()
     local_now, date_from, date_to = full_report_period(now, date_from, date_to)
@@ -38,6 +39,7 @@ def full_ten_day_report_data(connection, now=None, date_from=None, date_to=None)
         if "maternity_hospital" in columns else "sender.maternity_hospital"
     )
     review_status = "p.review_status" if "review_status" in columns else "''"
+    region_sql, region_params = region_condition(regions)
     records = connection.execute(
         f"""SELECT p.sent_at, COALESCE(p.doctor_name, '') AS doctor_name,
                    COALESCE(sender.city, 'Не указан') AS city,
@@ -49,8 +51,9 @@ def full_ten_day_report_data(connection, now=None, date_from=None, date_to=None)
             WHERE julianday(p.sent_at) >= julianday(?)
               AND julianday(p.sent_at) < julianday(?)
               AND checks.manual_decision = 'accepted'
+              {('AND ' + region_sql) if region_sql else ''}
             ORDER BY p.sent_at, p.id""",
-        (period_start.isoformat(), period_end.isoformat()),
+        (period_start.isoformat(), period_end.isoformat(), *region_params),
     ).fetchall()
 
     hospital_renames = load_hospital_renames(connection)
@@ -310,7 +313,7 @@ def build_full_ten_day_report(report_data):
 
 def rejected_photo_report_data(
     connection, now=None, date_from=None, date_to=None,
-    city="", hospital="", medic="", doctor="",
+    city="", hospital="", medic="", doctor="", regions=None,
 ):
     """Return operator-rejected photos and their comments for a selected period."""
     local_timezone = timezone.get_default_timezone()
@@ -361,6 +364,10 @@ def rejected_photo_report_data(
             doctor_key = doctor_search_key(doctor)
             conditions.append(doctor_search_condition())
             parameters.extend([f"%{doctor_key}%", doctor_key])
+        region_sql, region_params = region_condition(regions)
+        if region_sql:
+            conditions.append(region_sql)
+            parameters.extend(region_params)
 
         rows = connection.execute(
             f"""SELECT p.id, p.image, p.sent_at,

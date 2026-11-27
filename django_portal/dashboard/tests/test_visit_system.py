@@ -17,6 +17,9 @@ from ..decision_rules import DECISION_REVIEW, automatic_photo_decision
 
 
 class DecisionRuleTests(SimpleTestCase):
+    # Журнал и профили ролей хранятся в базе сайта.
+    databases = {"default"}
+
     def test_all_automatic_results_wait_for_operator(self):
         clean = automatic_photo_decision(
             "Нет явных признаков", "Код распознан: Ташкент",
@@ -56,6 +59,9 @@ class DecisionRuleTests(SimpleTestCase):
 
 
 class VisitSystemTests(SimpleTestCase):
+    # Журнал и профили ролей хранятся в базе сайта.
+    databases = {"default"}
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
