@@ -1,0 +1,4 @@
+{% if summary.photo_count %}<nav class="pagination" aria-label="Страницы фотографий">
+<span>Показаны {{ photo_page_start }}–{{ photo_page_end }} из {{ summary.photo_count }}</span>
+<div>{% if photo_page_previous %}<a class="button-link secondary" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ photo_page_previous }}">← Предыдущие</a>{% endif %}<strong>Страница {{ photo_page }} из {{ photo_page_count }}</strong>{% if photo_page_next %}<a class="button-link" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ photo_page_next }}">Следующие →</a>{% endif %}</div>
+</nav>{% endif %}

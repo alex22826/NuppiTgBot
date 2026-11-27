@@ -1,0 +1,21 @@
+{% load static %}
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Nuppi — {% if is_creator %}панель создателя{% else %}панель оператора{% endif %}{% endblock %}</title><link rel="stylesheet" href="{% static 'dashboard/style.css' %}?v=20261104-photo-number-search"><script src="{% static 'dashboard/photo_viewer.js' %}?v=20260908-pan" defer></script><script src="{% static 'dashboard/decision_controls.js' %}?v=20261016-edit-qr" defer></script></head>
+<body><header><a class="brand" href="{% url 'dashboard' %}">Nuppi · {% if is_creator %}панель создателя{% else %}панель оператора{% endif %}</a>{% if user.is_authenticated %}<a href="{% url 'logout' %}">Выйти</a>{% endif %}</header>
+<main>{% if messages %}{% for message in messages %}<p class="message {{ message.tags }}">{{ message }}</p>{% endfor %}{% endif %}{% block content %}{% endblock %}</main>
+<dialog id="photo-viewer" class="photo-viewer-dialog" aria-labelledby="photo-viewer-title">
+<div class="photo-viewer-shell">
+<div class="photo-viewer-header"><strong id="photo-viewer-title">Просмотр фотографии</strong><button type="button" class="photo-viewer-close" data-photo-viewer-close aria-label="Закрыть просмотр">×</button></div>
+<div class="photo-viewer-stage"><img id="photo-viewer-image" alt="Просматриваемая фотография"></div>
+<div class="photo-viewer-controls">
+<button type="button" data-photo-rotate="-90" aria-label="Повернуть фотографию налево">↶ Повернуть налево</button>
+<output id="photo-viewer-angle" aria-live="polite">0°</output>
+<button type="button" data-photo-rotate="90" aria-label="Повернуть фотографию направо">Повернуть направо ↷</button>
+<button type="button" class="secondary-control" data-photo-reset>Сбросить</button>
+<a id="photo-viewer-open" class="button-link secondary" href="#" target="_blank" rel="noopener">Открыть отдельно</a>
+<a id="photo-viewer-download" class="button-link" href="#">Скачать фото</a>
+</div>
+</div>
+</dialog>
+</body></html>

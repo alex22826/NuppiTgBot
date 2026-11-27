@@ -1,0 +1,22 @@
+Подключение Sightengine
+=======================
+
+1. Войдите в Sightengine и получите API User и API Secret.
+2. Откройте .env рядом с bot.py и добавьте:
+
+SIGHTENGINE_API_USER=ваш_API_User
+SIGHTENGINE_API_SECRET=ваш_API_Secret
+SIGHTENGINE_ENABLED=1
+
+3. Не публикуйте и не передавайте эти ключи другим людям.
+4. Установите обновлённые зависимости:
+
+python -m pip install -r requirements.txt
+
+5. Перезапустите bot.py. При первом запуске бот сам добавит новое поле в medical_bot.db.
+
+Порог пометки по умолчанию — 75%. При необходимости можно изменить его в .env:
+SIGHTENGINE_AI_THRESHOLD=0.75
+
+Фотографии не отклоняются: результат Sightengine отображается оператору как предварительная оценка.
+Режим AI_MAX_SAVINGS_MODE управляет только расходами OpenAI и больше не отключает Sightengine.

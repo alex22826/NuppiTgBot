@@ -1,0 +1,33 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Переписка с пользователями — Nuppi{% endblock %}
+{% block content %}
+<p><a class="button-link secondary" href="{% url 'dashboard' %}">← К фотографиям</a></p>
+<h1>Переписка с пользователями</h1>
+<p class="note">Журнал доступен создателю сайта и авторизованным операторам. Сохраняются новые сообщения после установки обновления.</p>
+{% if database_error %}<p class="error">{{ database_error }}</p>
+{% elif chat_unavailable %}<p class="note">Журнал ещё не создан. Он появится после перезапуска обновлённого бота.</p>
+{% elif not conversations %}<p class="note">Новых сообщений пока нет.</p>
+{% else %}
+<form class="filters chat-filters" method="get">
+<label>Пользователь
+<select name="telegram_id">
+{% for conversation in conversations %}<option value="{{ conversation.telegram_id }}"{% if conversation.telegram_id == selected_telegram_id %} selected{% endif %}>{{ conversation.full_name }} · {{ conversation.telegram_id }} ({{ conversation.message_count }})</option>{% endfor %}
+</select>
+</label>
+<label>Дата от<input type="date" name="date_from" value="{{ selected_date_from }}"></label>
+<label>Дата до<input type="date" name="date_to" value="{{ selected_date_to }}"></label>
+<button type="submit">Показать</button>
+</form>
+{% if selected_conversation %}<h2>{{ selected_conversation.full_name }}</h2><p class="note">Telegram ID: {{ selected_conversation.telegram_id }}{% if selected_conversation.username %} · @{{ selected_conversation.username }}{% endif %}</p>{% endif %}
+<section class="chat-window" aria-label="История переписки">
+{% for item in chat_messages %}
+<article class="chat-bubble {{ item.direction }}">
+<small class="chat-meta">{% if item.direction == 'incoming' %}Пользователь{% else %}Бот{% endif %} · {{ item.type_label }} · {{ item.created_at_display }}</small>
+{% if item.photo_id %}<a class="chat-photo" href="{% url 'photo_image' item.photo_id %}" target="_blank" rel="noopener"><img src="{% url 'photo_image' item.photo_id %}?thumbnail=1" alt="Фотография из переписки" loading="lazy"></a>{% elif item.message_type == 'photo' %}<span class="chat-attachment">📷 Фотография</span>{% elif item.message_type == 'document' %}<span class="chat-attachment">📎 Файл</span>{% endif %}
+{% if item.text %}<div class="chat-text">{{ item.text|linebreaksbr }}</div>{% endif %}
+</article>
+{% empty %}<p class="note">За выбранный период сообщений нет.</p>{% endfor %}
+</section>
+<p class="note">Показываются последние {{ chat_history_limit }} сообщений выбранной переписки.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Фотография №{{ photo.id }} — Nuppi{% endblock %}
+{% block content %}
+<h1>Фотография №{{ photo.id }}</h1>
+<div class="photo-detail-layout">
+<a class="photo-viewer-link photo-detail-image" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener">
+<img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фотография №{{ photo.id }}" decoding="async">
+</a>
+<section class="photo-detail-info" aria-labelledby="photo-details-heading">
+<h2 id="photo-details-heading">Данные фотографии</h2>
+<p><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span></p>
+<dl class="photo-detail-list">
+<dt>Номер</dt><dd>№{{ photo.id }}</dd>
+<dt>Врач</dt><dd>{{ photo.doctor_name|default:'Не указан' }}</dd>
+<dt>Отправитель</dt><dd>{{ photo.sender_name }}</dd>
+<dt>Telegram ID</dt><dd>{{ photo.sender_telegram_id }}</dd>
+<dt>Город и роддом</dt><dd>{{ photo.city }} · {{ photo.maternity_hospital }}</dd>
+<dt>Отправлено</dt><dd>{{ photo.sent_at_display }}</dd>
+<dt>QR/Data Matrix</dt><dd>{{ photo.qr_data|default:'—' }}</dd>
+<dt>Проверка кода</dt><dd>{{ photo.code_status|default:'Нет данных' }}</dd>
+<dt>Дата на упаковке</dt><dd>{{ photo.photo_date|default:'—' }}</dd>
+<dt>Номер на упаковке</dt><dd>{{ photo.package_number|default:'—' }}</dd>
+<dt>Роженица</dt><dd>{{ photo.mother_name|default:'—' }}</dd>
+<dt>Автопроверка</dt><dd>{{ photo.review_status|default:'Не проверено' }}</dd>
+{% if photo.review_reason %}<dt>Причина автопроверки</dt><dd>{{ photo.review_reason }}</dd>{% endif %}
+{% if photo.manual_reason %}<dt>Комментарий оператора</dt><dd>{{ photo.manual_reason }}</dd>{% endif %}
+</dl>
+<div class="photo-detail-actions">
+<a class="button-link" href="{% url 'photo_image' photo.id %}?download=1">Скачать фотографию</a>
+{% include 'dashboard/photo_original_link.html' with photo=photo %}
+<a class="button-link secondary" href="{% url 'dashboard' %}">Вернуться ко всем фотографиям</a>
+</div>
+</section>
+</div>
+{% endblock %}

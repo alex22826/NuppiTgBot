@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Поиск фотографии — Nuppi{% endblock %}
+{% block content %}
+<div class="lookup-error-card">
+<h1>Фотография не открыта</h1>
+<p class="error" role="alert">{{ lookup_error }}</p>
+<form class="photo-number-search" method="get" action="{% url 'photo_lookup' %}">
+<label for="photo-number"><strong>Номер фотографии</strong></label>
+<input id="photo-number" name="photo_id" type="number" min="1" step="1" inputmode="numeric" value="{{ requested_photo_id|default:'' }}" placeholder="Например, 8450" required autofocus>
+<button type="submit">Найти</button>
+</form>
+<p><a class="button-link secondary" href="{% url 'dashboard' %}">Вернуться ко всем фотографиям</a></p>
+</div>
+{% endblock %}

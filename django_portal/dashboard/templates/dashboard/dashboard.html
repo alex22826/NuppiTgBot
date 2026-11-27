@@ -1,0 +1,46 @@
+{% extends 'dashboard/base.html' %}{% block content %}
+<h1>Фотографии из Telegram‑бота</h1>
+<p>{% if is_creator %}<a class="button-link secondary" href="{% url 'management' %}?city={{ selected_city|urlencode }}&amp;hospital={{ selected_hospital|urlencode }}">Управление сотрудниками и роддомами</a> {% endif %}<a class="button-link" href="{% url 'chat_history' %}">Переписка с пользователями</a></p>
+{% if database_error %}<p class="error">{{ database_error }} Укажите BOT_DB_PATH в файле .env сайта.</p>{% else %}
+<form class="photo-number-search" method="get" action="{% url 'photo_lookup' %}">
+<label for="photo-number"><strong>Открыть фотографию по номеру</strong><span>Номер указан в заголовке фотографии, например 8450</span></label>
+<input id="photo-number" name="photo_id" type="number" min="1" step="1" inputmode="numeric" placeholder="Например, 8450" required>
+<button type="submit">Найти фотографию</button>
+</form>
+<div class="stats">
+<div><b>{{ scope_summary.photo_count }}</b><span>фотографий за всё время{% if selected_doctor %} врача «{{ selected_doctor }}»{% endif %}{% if selected_medic %} от выбранного медика{% endif %}{% if selected_city %} в выбранном городе{% if selected_hospital %} и роддоме{% endif %}{% else %} по всем городам{% endif %}</span></div>
+<div id="period-photo-counter"><b>{{ summary.photo_count }}</b><span>фотографий за выбранный период</span><small>{{ selected_period_label }}</small></div>
+<div><b>{{ summary.visit_count }}</b><span>визитов за выбранный период</span><small>Старые фото без серии считаются отдельными визитами</small></div>
+<div><b>{{ medic_total.medic_count }}</b><span>медиков{% if selected_city %} в выбранном городе{% endif %}{% if selected_hospital %} и роддоме{% endif %}</span></div>
+</div>
+<p class="note">Счётчик за выбранный период учитывает все фильтры: город, роддом, врача, медика и даты. Включены все сохранённые фотографии, в том числе копии и ещё проверяемые.</p>
+<div class="decision-stats">
+<a class="decision-card accepted{% if selected_decision == 'accepted' %} selected{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=accepted"><b>{{ decision_counts.accepted }}</b><span>Принято</span></a>
+<a class="decision-card review{% if selected_decision == 'review' %} selected{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=review"><b>{{ decision_counts.review }}</b><span>На проверке</span></a>
+<a class="decision-card rejected{% if selected_decision == 'rejected' %} selected{% endif %}" href="?{% if decision_query %}{{ decision_query }}&amp;{% endif %}decision=rejected"><b>{{ decision_counts.rejected }}</b><span>Отклонено</span></a>
+</div>
+<p class="note">Все фотографии изначально находятся «На проверке». Автоматическая проверка только подсвечивает признаки: жёлтым — возможные копии, обрезки и сомнительные коды; красным — признаки ИИ или подделки. Итог «Принято» или «Отклонено» устанавливает только оператор.</p>
+<form class="filters" method="get"><label>Город<select name="city" onchange="this.form.elements.hospital.value='';this.form.elements.doctor.value='';this.form.submit()"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}" {% if item == selected_city %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label>Роддом<select name="hospital" onchange="this.form.elements.doctor.value='';this.form.submit()"><option value="">Все роддома</option>{% for item in hospitals %}<option value="{{ item }}" {% if item == selected_hospital %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label><label>Врач<select name="doctor"><option value="">Все врачи</option>{% for group in doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}" {% if doctor == selected_doctor %}selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label><label>Медик<select name="medic"><option value="">Все медики</option>{% for medic in medics %}<option value="{{ medic.telegram_id }}" {% if medic.telegram_id == selected_medic_id %}selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label><label>Итог проверки<select name="decision"><option value="">Все итоги</option>{% for value, label in decision_labels.items %}<option value="{{ value }}" {% if value == selected_decision %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><label>С даты<input type="date" name="date_from" value="{{ selected_date_from }}"></label><label>По дату<input type="date" name="date_to" value="{{ selected_date_to }}"></label><button>Показать</button><button formaction="{% url 'export_photos' %}">Скачать Excel</button></form>
+<form class="filters report-period-form" method="get" action="{% url 'export_full_ten_day_report' %}"><strong>Полный отчёт</strong><label>С даты<input type="date" name="date_from" value="{{ full_report_date_from }}" required></label><label>По дату<input type="date" name="date_to" value="{{ full_report_date_to }}" required></label><button>Скачать полный Excel</button></form>
+<p class="note">По умолчанию автоматически выбраны последние 10 календарных дней, включая сегодняшний. Оператор может указать любой другой период. В полный отчёт входят только фотографии, которые оператор вручную отметил «Принято». Фотографии «На проверке» и «Отклонено» не включаются.</p>
+<form class="filters report-period-form" method="get" action="{% url 'export_rejected_photo_report' %}">
+<strong>Отчёт по отклонённым фотографиям</strong>
+<label>Город<select name="city"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}" {% if item == selected_city %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label>Роддом<select name="hospital"><option value="">Все роддома</option>{% for item in report_hospital_options %}<option value="{{ item.maternity_hospital }}" {% if item.city == selected_city and item.maternity_hospital == selected_hospital %}selected{% endif %}>{{ item.city }} · {{ item.maternity_hospital }}</option>{% endfor %}</select></label>
+<label>Врач<select name="doctor"><option value="">Все врачи</option>{% for group in report_doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}" {% if doctor == selected_doctor %}selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
+<label>Медик<select name="medic"><option value="">Все медики</option>{% for medic in report_medics %}<option value="{{ medic.telegram_id }}" {% if medic.telegram_id == selected_medic_id %}selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label>
+<label>С даты<input type="date" name="date_from" value="{{ full_report_date_from }}" required></label>
+<label>По дату<input type="date" name="date_to" value="{{ full_report_date_to }}" required></label>
+<button class="danger">Скачать отклонённые фото</button>
+</form>
+<p class="note">Можно выбрать любой период, город, роддом, врача и медика. В Excel войдут только фотографии, которым оператор вручную поставил «Отклонено», вместе с фотографией и комментарием оператора.</p>
+<p class="note">Сначала выберите город, затем роддом и врача. Врачи сгруппированы по городам и роддомам. Фильтр «Медик» показывает фотографии выбранного отправителя. Все фильтры применяются и к Excel.</p>
+{% if medic_stats %}<section class="users"><h2>Статистика медиков за выбранный период</h2><div class="table-wrap"><table><thead><tr><th>Медик</th><th>Telegram ID</th><th>Визиты</th><th>Фотографии</th><th>Принято</th><th>На проверке</th><th>Отклонено</th></tr></thead><tbody>{% for medic in medic_stats %}<tr><td>{{ medic.medic_name }}</td><td>{{ medic.sender_telegram_id }}</td><td>{{ medic.visit_count }}</td><td>{{ medic.photo_count }}</td><td>{{ medic.accepted_count }}</td><td>{{ medic.review_count }}</td><td>{{ medic.rejected_count }}</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+{% if not photos %}<p>Фотографий по выбранным условиям нет.</p>{% endif %}
+{% include 'dashboard/photo_pagination.html' %}
+{% if photo_groups.clear %}<h2>Фотографии без замечаний</h2><div class="grid">{% for photo in photo_groups.clear %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='clear' %}{% endfor %}</div>{% endif %}
+{% if photo_groups.yellow %}<h2>Требуют проверки: копии, обрезки или другой код</h2><div class="grid">{% for photo in photo_groups.yellow %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='yellow' %}{% endfor %}</div>{% endif %}
+{% if photo_groups.red %}<h2>Требуют проверки: возможное ИИ-изображение или подделка</h2><div class="grid">{% for photo in photo_groups.red %}{% include 'dashboard/photo_card_return.html' with photo=photo card_class='red' %}{% endfor %}</div>{% endif %}
+{% include 'dashboard/photo_pagination.html' %}{% endif %}
+{% endblock %}
