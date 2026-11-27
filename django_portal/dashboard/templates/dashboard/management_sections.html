@@ -1,9 +1,9 @@
 <section class="panel manage-section" id="employees" aria-labelledby="employees-title">
-<div class="panel-head">
+<div class="panel-head"><span class="section-icon"><svg class="icon" aria-hidden="true"><use href="#i-admin"/></svg></span>
 <div><h2 id="employees-title">Сотрудники бота</h2><p>Медики отправляют фото, операторы получают отчёты в боте. Добавленный здесь человек сразу получает доступ к боту.</p></div>
 </div>
 <details class="add-box"{% if not registered_users %} open{% endif %}>
-<summary class="btn">+ Добавить сотрудника</summary>
+<summary class="btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Добавить сотрудника</summary>
 <form class="panel" method="post" action="{% url 'add_employee' %}">{% csrf_token %}
 <div class="panel-head"><h3>Новый сотрудник</h3></div>
 <div class="form-grid">
@@ -25,20 +25,21 @@
 <span class="hint table-count" data-filter-count></span>
 </div>
 <div class="table-wrap has-menus"><table id="employees-table" data-sortable>
-<thead><tr><th data-sort="text">Сотрудник</th><th data-sort="text">Роль</th><th data-sort="num">Telegram ID</th><th class="num" data-sort="num">Фото</th><th data-sort="text">Доступ</th><th></th></tr></thead>
+<thead><tr><th data-sort="text">Сотрудник</th><th class="hide-xs" data-sort="text">Роль</th><th class="hide-sm" data-sort="num">Telegram ID</th><th class="num hide-sm" data-sort="num">Фото</th><th data-sort="text">Доступ</th><th></th></tr></thead>
 <tbody>{% for item in registered_users %}<tr data-filter-item data-role="{{ item.role }}" data-status="{% if item.is_active %}on{% else %}off{% endif %}"{% if not item.is_active %} class="row-off"{% endif %}>
-<td data-value="{{ item.full_name }}"><b>{{ item.full_name }}</b><small>{{ item.city|default:'' }}{% if item.username %} · @{{ item.username }}{% endif %}</small></td>
-<td>{{ item.role }}</td>
-<td>{{ item.telegram_id }}</td>
-<td class="num">{{ item.photo_count }}</td>
+<td data-value="{{ item.full_name }}"><div class="person"><span class="avatar-sm" data-avatar="{{ item.full_name }}">{{ item.full_name|slice:":1"|upper }}</span><div><b>{{ item.full_name }}</b><small>{{ item.city|default:'' }}{% if item.username %} · @{{ item.username }}{% endif %}</small></div></div></td>
+<td class="hide-xs"><span class="role-tag{% if item.role == 'Оператор' %} operator{% endif %}">{{ item.role }}</span></td>
+<td class="mono hide-sm">{{ item.telegram_id }}</td>
+<td class="num hide-sm">{{ item.photo_count }}</td>
 <td>{% if item.is_active %}<span class="tag on">Открыт</span>{% else %}<span class="tag off">Отключён</span>{% endif %}</td>
 <td><div class="cell-actions">
-<a class="btn btn-secondary btn-sm" href="{% url 'edit_employee' item.telegram_id %}">Изменить</a>
-<details class="menu"><summary class="btn btn-ghost btn-sm" aria-label="Ещё действия">Ещё ▾</summary>
+<a class="btn btn-secondary btn-sm" href="{% url 'edit_employee' item.telegram_id %}" title="Изменить" aria-label="Изменить: {{ item.full_name }}"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg><span class="btn-label">Изменить</span></a>
+<details class="menu"><summary class="btn btn-ghost btn-sm icon-only" aria-label="Ещё действия" title="Ещё действия"><svg class="icon" aria-hidden="true"><use href="#i-dots"/></svg></summary>
 <div class="menu-list">
-{% if item.is_active %}<form method="post" action="{% url 'disable_user' item.telegram_id %}" onsubmit="return confirm('Отключить доступ к боту для «{{ item.full_name|escapejs }}»?')">{% csrf_token %}<button class="btn-ghost btn-sm">Отключить доступ к боту</button></form>{% endif %}
-{% if item.role == 'Медик' and item.photo_count %}<form method="post" action="{% url 'delete_employee_photos' item.telegram_id %}" onsubmit="return confirm('Удалить все фотографии медика «{{ item.full_name|escapejs }}»? Будет удалено: {{ item.photo_count }}. Восстановить фотографии будет невозможно.')">{% csrf_token %}<button class="btn-danger-outline btn-sm">Удалить все фото ({{ item.photo_count }})</button></form>{% endif %}
-<form method="post" action="{% url 'delete_employee' item.telegram_id %}" onsubmit="return confirm('Полностью удалить сотрудника? Доступ и профиль будут удалены, но фото останутся в базе.')">{% csrf_token %}<button class="btn-danger-outline btn-sm">Удалить сотрудника</button></form>
+{% if item.is_active %}<form method="post" action="{% url 'disable_user' item.telegram_id %}" onsubmit="return confirm('Отключить доступ к боту для «{{ item.full_name|escapejs }}»?')">{% csrf_token %}<button class="menu-item"><svg class="icon" aria-hidden="true"><use href="#i-block"/></svg>Отключить доступ к боту</button></form>{% endif %}
+{% if item.role == 'Медик' and item.photo_count %}<form method="post" action="{% url 'delete_employee_photos' item.telegram_id %}" onsubmit="return confirm('Удалить все фотографии медика «{{ item.full_name|escapejs }}»? Будет удалено: {{ item.photo_count }}. Восстановить фотографии будет невозможно.')">{% csrf_token %}<button class="menu-item danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить все фото ({{ item.photo_count }})</button></form>{% endif %}
+<hr class="menu-sep">
+<form method="post" action="{% url 'delete_employee' item.telegram_id %}" onsubmit="return confirm('Полностью удалить сотрудника? Доступ и профиль будут удалены, но фото останутся в базе.')">{% csrf_token %}<button class="menu-item danger"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>Удалить сотрудника</button></form>
 </div></details>
 </div></td>
 </tr>{% endfor %}</tbody>
@@ -48,20 +49,20 @@
 </section>
 
 <section class="panel manage-section" id="operators" aria-labelledby="operators-title">
-<div class="panel-head"><div><h2 id="operators-title">Входы операторов на сайт</h2><p>Оператор видит фото, ставит решения и скачивает отчёты. Управление ему недоступно.</p></div></div>
+<div class="panel-head"><span class="section-icon"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg></span><div><h2 id="operators-title">Входы операторов на сайт</h2><p>Оператор видит фото, ставит решения и скачивает отчёты. Управление ему недоступно.</p></div></div>
 <form method="post" action="{% url 'add_site_operator' %}">{% csrf_token %}
 <div class="form-grid">
 <label class="field"><span>Логин</span><input name="site_username" autocomplete="off" required></label>
 <label class="field"><span>Пароль</span><input name="site_password" type="password" autocomplete="new-password" placeholder="Не короче 8 символов" required></label>
-<div><button>Создать вход</button></div>
+<div><button><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>Создать вход</button></div>
 </div>
 </form>
 </section>
 
 <section class="panel manage-section" id="assignments" aria-labelledby="assignments-title">
-<div class="panel-head"><div><h2 id="assignments-title">Задания для визитов</h2><p>Задание привязывается к следующему визиту с тем же городом, роддомом, врачом и периодом. Медикам порядок отправки фото не меняется.</p></div></div>
+<div class="panel-head"><span class="section-icon"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg></span><div><h2 id="assignments-title">Задания для визитов</h2><p>Задание привязывается к следующему визиту с тем же городом, роддомом, врачом и периодом. Медикам порядок отправки фото не меняется.</p></div></div>
 <details class="add-box">
-<summary class="btn">+ Новое задание</summary>
+<summary class="btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Новое задание</summary>
 <form class="panel" method="post" action="{% url 'add_visit_assignment' %}">{% csrf_token %}
 <div class="form-grid">
 <label class="field"><span>Медик</span><select name="medic_telegram_id"><option value="">Все медики</option>{% for item in registered_users %}{% if item.role == 'Медик' and item.is_active %}<option value="{{ item.telegram_id }}">{{ item.full_name }}</option>{% endif %}{% endfor %}</select></label>
@@ -78,12 +79,12 @@
 </details>
 {% if assignments %}<div class="table-wrap" style="margin-top:14px"><table data-sortable>
 <thead><tr><th data-sort="text">Медик</th><th data-sort="text">Где</th><th data-sort="text">Врач</th><th data-sort="text">Продукт</th><th data-sort="text">Материал</th><th data-sort="text">Период</th><th></th></tr></thead>
-<tbody>{% for item in assignments %}<tr><td>{{ item.medic_name }}</td><td>{{ item.city }} · {{ item.maternity_hospital }}</td><td>{{ item.doctor_name|default:'Любой' }}</td><td>{{ item.required_product|default:'—' }}</td><td>{{ item.required_material|default:'—' }}</td><td>{{ item.date_from|default:'…' }} — {{ item.date_to|default:'…' }}</td><td><div class="cell-actions"><form method="post" action="{% url 'delete_visit_assignment' item.id %}" onsubmit="return confirm('Удалить это задание?')">{% csrf_token %}<button class="btn-danger-outline btn-sm">Удалить</button></form></div></td></tr>{% endfor %}</tbody>
+<tbody>{% for item in assignments %}<tr><td>{{ item.medic_name }}</td><td>{{ item.city }} · {{ item.maternity_hospital }}</td><td>{{ item.doctor_name|default:'Любой' }}</td><td>{{ item.required_product|default:'—' }}</td><td>{{ item.required_material|default:'—' }}</td><td>{{ item.date_from|default:'…' }} — {{ item.date_to|default:'…' }}</td><td><div class="cell-actions"><form method="post" action="{% url 'delete_visit_assignment' item.id %}" onsubmit="return confirm('Удалить это задание?')">{% csrf_token %}<button class="btn-ghost btn-sm icon-only danger-hover" title="Удалить задание" aria-label="Удалить задание"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button></form></div></td></tr>{% endfor %}</tbody>
 </table></div>{% else %}<p class="hint" style="margin-top:12px">Заданий пока нет.</p>{% endif %}
 </section>
 
 <section class="panel manage-section" id="hospitals" aria-labelledby="hospitals-title">
-<div class="panel-head"><div><h2 id="hospitals-title">Переименовать или объединить роддом</h2><p>Все фото и назначения со старым названием перейдут в новое. Если новое название уже есть — записи объединятся без дублей.</p></div></div>
+<div class="panel-head"><span class="section-icon"><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg></span><div><h2 id="hospitals-title">Переименовать или объединить роддом</h2><p>Все фото и назначения со старым названием перейдут в новое. Если новое название уже есть — записи объединятся без дублей.</p></div></div>
 <form method="post" action="{% url 'rename_hospital' %}">{% csrf_token %}
 <div class="form-grid">
 <label class="field"><span>Город</span><input name="city" value="{{ selected_city }}" placeholder="Например: Самарканд" required></label>
@@ -95,13 +96,13 @@
 </section>
 
 <section class="panel manage-section danger-zone" id="cleanup" aria-labelledby="cleanup-title">
-<div class="panel-head"><div><h2 id="cleanup-title">Удалить фотографии по сотруднику, роддому и дате</h2><p>Удалятся только фото, у которых совпадают сразу сотрудник, роддом и дата отправки (по Ташкенту). Профиль сотрудника останется. Восстановить фото будет нельзя.</p></div></div>
+<div class="panel-head"><span class="section-icon danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></span><div><h2 id="cleanup-title">Удалить фотографии по сотруднику, роддому и дате</h2><p>Удалятся только фото, у которых совпадают сразу сотрудник, роддом и дата отправки (по Ташкенту). Профиль сотрудника останется. Восстановить фото будет нельзя.</p></div></div>
 <form method="post" action="{% url 'delete_filtered_photos' %}" onsubmit="return confirm('Удалить фотографии, совпадающие по выбранному сотруднику, роддому и дате отправки? Восстановить их будет невозможно.')">{% csrf_token %}
 <div class="form-grid">
 <label class="field"><span>Сотрудник</span><select name="telegram_id" required><option value="">Выберите…</option>{% for item in registered_users %}{% if item.photo_count %}<option value="{{ item.telegram_id }}">{{ item.full_name }} — {{ item.photo_count }} фото</option>{% endif %}{% endfor %}</select></label>
 <label class="field"><span>Роддом</span><select name="location" required><option value="">Выберите…</option>{% for location in photo_delete_locations %}<option value="{{ location.value }}">{{ location.city }} · {{ location.hospital }}</option>{% endfor %}</select></label>
 <label class="field"><span>Дата отправки</span><input type="date" name="sent_date" value="{{ today_date|date:'Y-m-d' }}" required></label>
-<div><button class="btn-danger">Удалить выбранные фото</button></div>
+<div><button class="btn-danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить выбранные фото</button></div>
 </div>
 </form>
 </section>

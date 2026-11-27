@@ -17,7 +17,7 @@
 <label class="search-box"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Поиск по пользователям</span><input type="search" placeholder="Поиск по имени или ID" data-filter-list="#chat-list"></label>
 <nav class="chat-list" id="chat-list" aria-label="Пользователи">
 {% for conversation in conversations %}<a data-filter-item href="?telegram_id={{ conversation.telegram_id }}{% if selected_date_from %}&amp;date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&amp;date_to={{ selected_date_to }}{% endif %}"{% if conversation.telegram_id == selected_telegram_id %} aria-current="true"{% endif %}>
-<span class="name">{{ conversation.full_name }}</span><span class="badge">{{ conversation.message_count }}</span>
+<span class="avatar-sm" data-avatar="{{ conversation.full_name }}">{{ conversation.full_name|slice:":1"|upper }}</span><span class="name">{{ conversation.full_name }}</span><span class="badge">{{ conversation.message_count }}</span>
 <span class="sub">ID {{ conversation.telegram_id }}{% if conversation.username %} · @{{ conversation.username }}{% endif %}</span>
 </a>{% endfor %}
 <p class="hint filter-empty" hidden>Никого не найдено</p>
@@ -25,7 +25,7 @@
 </div>
 <div class="chat-main">
 <div class="chat-head">
-<div>{% if selected_conversation %}<h2>{{ selected_conversation.full_name }}</h2><p class="hint">Telegram ID: {{ selected_conversation.telegram_id }}{% if selected_conversation.username %} · @{{ selected_conversation.username }}{% endif %}</p>{% endif %}</div>
+<div class="person">{% if selected_conversation %}<span class="avatar" data-avatar="{{ selected_conversation.full_name }}">{{ selected_conversation.full_name|slice:":1"|upper }}</span><div><h2>{{ selected_conversation.full_name }}</h2><p class="hint">Telegram ID: {{ selected_conversation.telegram_id }}{% if selected_conversation.username %} · @{{ selected_conversation.username }}{% endif %}</p></div>{% endif %}</div>
 <form method="get">
 <input type="hidden" name="telegram_id" value="{{ selected_telegram_id|default:'' }}">
 <label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ selected_date_from }}"></label>
@@ -36,7 +36,7 @@
 <section class="chat-window" aria-label="История переписки">
 {% for item in chat_messages %}
 <article class="chat-bubble {{ item.direction }}">
-<small class="chat-meta">{% if item.direction == 'incoming' %}Пользователь{% else %}Бот{% endif %} · {{ item.type_label }} · {{ item.created_at_display }}</small>
+<small class="chat-meta">{% if item.direction == 'incoming' %}Пользователь{% else %}Бот{% endif %}{% if item.message_type != 'text' %} · {{ item.type_label }}{% endif %}<time>{{ item.created_at_display }}</time></small>
 {% if item.photo_id %}<a class="chat-photo" href="{% url 'photo_detail' item.photo_id %}" title="Открыть фотографию №{{ item.photo_id }}"><img src="{% url 'photo_image' item.photo_id %}?thumbnail=1" alt="Фотография из переписки" loading="lazy"></a>{% elif item.message_type == 'photo' %}<span class="chat-attachment">📷 Фотография</span>{% elif item.message_type == 'document' %}<span class="chat-attachment">📎 Файл</span>{% endif %}
 {% if item.text %}<div class="chat-text">{{ item.text|linebreaksbr }}</div>{% endif %}
 </article>

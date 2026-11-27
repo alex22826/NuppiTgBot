@@ -3,6 +3,7 @@
 {% block guest %}
 <div class="login-wrap">
 <section class="panel login-card">
+<div class="login-brand"><span class="brand-mark">N</span><span>Nuppi</span></div>
 <h1 style="margin-bottom:6px">Вход в панель</h1>
 <p class="muted">Введите логин и пароль, которые выдал создатель сайта.</p>
 {% if request.GET.csrf %}<p class="error">Страница входа устарела. Введите логин и пароль ещё раз.</p>{% endif %}

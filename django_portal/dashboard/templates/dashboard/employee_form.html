@@ -2,7 +2,7 @@
 {% block title %}{{ employee.full_name }} — Nuppi{% endblock %}
 {% block crumbs %}<a href="{% url 'management' %}">Управление</a><a href="{% url 'management' %}#employees">Сотрудники</a><span>{{ employee.full_name }}</span>{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>{{ employee.full_name }}</h1><p>Изменения сразу применяются в боте.</p></div></div>
+<div class="page-head"><div class="person person-lg"><span class="avatar" data-avatar="{{ employee.full_name }}">{{ employee.full_name|slice:":1"|upper }}</span><div><h1>{{ employee.full_name }}</h1><p>{{ employee.role }} · ID {{ employee.telegram_id }} · изменения сразу применяются в боте.</p></div></div></div>
 <form class="panel" method="post" style="max-width:760px">{% csrf_token %}
 <div class="form-grid">
 <label class="field"><span>Telegram ID</span><input name="telegram_id" value="{{ employee.telegram_id }}" readonly></label>
