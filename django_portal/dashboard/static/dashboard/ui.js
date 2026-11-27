@@ -97,6 +97,17 @@
   });
   window.addEventListener("pageshow", () => progress && progress.classList.remove("is-loading"));
 
+  /* ---------- Короткие адреса: пустые поля фильтров не попадают в ссылку ---------- */
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (event.defaultPrevented || (form.method || "get").toLowerCase() !== "get") return;
+    const empty = [...form.elements].filter((field) => field.name && !field.disabled
+      && (field.tagName === "INPUT" || field.tagName === "SELECT") && field.type !== "submit" && field.value === "");
+    empty.forEach((field) => { field.disabled = true; });
+    // Если переход не случился (например, скачивание файла), поля возвращаются.
+    setTimeout(() => empty.forEach((field) => { field.disabled = false; }), 0);
+  });
+
   /* ---------- Меню «Ещё»: одно открытое, закрытие кликом мимо и Esc ---------- */
   const menus = () => document.querySelectorAll("details.menu[open]");
   document.addEventListener("toggle", (event) => {
@@ -139,7 +150,7 @@
     });
   };
   if (viewButtons.length) {
-    applyView(store.get("nuppi.photoView") === "list" ? "list" : "grid");
+    applyView(store.get("nuppi.photoView") === "grid" ? "grid" : "list");
     viewButtons.forEach((button) => button.addEventListener("click", () => {
       applyView(button.dataset.photoView);
       store.set("nuppi.photoView", button.dataset.photoView);
@@ -198,6 +209,68 @@
       });
     });
   });
+
+  /* ---------- Переписка: поиск по сообщениям и фильтр «чьи» ---------- */
+  const chatWindow = document.querySelector(".chat-window");
+  if (chatWindow) {
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    const tools = document.querySelector("[data-chat-tools]");
+    const search = tools && tools.querySelector("[data-chat-search]");
+    const count = tools && tools.querySelector("[data-chat-count]");
+    const none = chatWindow.querySelector("[data-chat-none]");
+    const bubbles = [...chatWindow.querySelectorAll(".chat-bubble")];
+    let direction = "";
+    bubbles.forEach((bubble) => {
+      const text = bubble.querySelector(".chat-text");
+      if (text) text.dataset.original = text.innerHTML;
+    });
+    const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const applyChat = () => {
+      const query = (search?.value || "").trim();
+      const pattern = query ? new RegExp(`(${escapeRegExp(query)})`, "gi") : null;
+      let shown = 0;
+      bubbles.forEach((bubble) => {
+        const text = bubble.querySelector(".chat-text");
+        const plain = (text?.textContent || "") + " " + (bubble.querySelector(".chat-meta")?.textContent || "");
+        const visible = (!direction || bubble.dataset.direction === direction)
+          && (!query || plain.toLocaleLowerCase("ru").includes(query.toLocaleLowerCase("ru")));
+        bubble.hidden = !visible;
+        if (visible) shown += 1;
+        if (text) {
+          text.innerHTML = text.dataset.original;
+          if (pattern && visible) {
+            const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+            const nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            nodes.forEach((node) => {
+              if (!pattern.test(node.textContent)) return;
+              pattern.lastIndex = 0;
+              const span = document.createElement("span");
+              span.innerHTML = node.textContent.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(pattern, "<mark>$1</mark>");
+              node.replaceWith(...span.childNodes);
+            });
+          }
+        }
+      });
+      chatWindow.querySelectorAll(".chat-day").forEach((day) => {
+        let next = day.nextElementSibling;
+        let any = false;
+        while (next && !next.classList.contains("chat-day")) {
+          if (next.classList.contains("chat-bubble") && !next.hidden) any = true;
+          next = next.nextElementSibling;
+        }
+        day.hidden = !any;
+      });
+      if (none) none.hidden = shown !== 0 || bubbles.length === 0;
+      if (count) count.textContent = (query || direction) && bubbles.length ? `Найдено: ${shown} из ${bubbles.length}` : "";
+    };
+    search?.addEventListener("input", applyChat);
+    tools?.querySelectorAll("[data-chat-direction]").forEach((button) => button.addEventListener("click", () => {
+      direction = button.dataset.chatDirection;
+      tools.querySelectorAll("[data-chat-direction]").forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
+      applyChat();
+    }));
+  }
 
   /* ---------- Фильтрация таблиц и списков без перезагрузки ---------- */
   const normalize = (value) => value.toLocaleLowerCase("ru").replace(/ё/g, "е").trim();

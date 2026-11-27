@@ -4,14 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}Nuppi — фотоотчёты{% endblock %}</title>
-<script>try{if(localStorage.getItem("nuppi.sidebar")==="collapsed")document.documentElement.classList.add("sidebar-collapsed");if(localStorage.getItem("nuppi.photoView")==="list")document.documentElement.classList.add("photo-view-list")}catch(e){}</script>
+<script>addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){t.ready.catch(function(){});t.finished.catch(function(){})}});try{if(localStorage.getItem("nuppi.sidebar")==="collapsed")document.documentElement.classList.add("sidebar-collapsed");if(localStorage.getItem("nuppi.photoView")!=="grid")document.documentElement.classList.add("photo-view-list")}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="{% static 'dashboard/style.css' %}?v=20261127-ui4">
-<script src="{% static 'dashboard/ui.js' %}?v=20261127-ui4" defer></script>
-<script src="{% static 'dashboard/photo_viewer.js' %}?v=20261127-ui4" defer></script>
-<script src="{% static 'dashboard/decision_controls.js' %}?v=20261127-ui4" defer></script>
+<link rel="stylesheet" href="{% static 'dashboard/style.css' %}?v=20261127-ui6">
+<script src="{% static 'dashboard/ui.js' %}?v=20261127-ui6" defer></script>
+<script src="{% static 'dashboard/widgets.js' %}?v=20261127-ui6" defer></script>
+<script src="{% static 'dashboard/photo_panel.js' %}?v=20261127-ui6" defer></script>
+<script src="{% static 'dashboard/photo_viewer.js' %}?v=20261127-ui6" defer></script>
+<script src="{% static 'dashboard/decision_controls.js' %}?v=20261127-ui6" defer></script>
 </head>
 <body>
 <div class="nav-progress" aria-hidden="true"></div>
@@ -51,6 +53,13 @@
 <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/></symbol>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h2M12 14h2M16 14h0M8 17h2M12 17h2"/></symbol>
+<symbol id="i-rotate-left" viewBox="0 0 24 24"><path d="M4 4v6h6"/><path d="M5.5 15a7.5 7.5 0 1 0 1.8-7.8L4 10"/></symbol>
+<symbol id="i-rotate-right" viewBox="0 0 24 24"><path d="M20 4v6h-6"/><path d="M18.5 15a7.5 7.5 0 1 1-1.8-7.8L20 10"/></symbol>
+<symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+<symbol id="i-actual" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M8 9.5v5M8 9.5l-1.2 1M15.5 9.5v5M15.5 9.5l-1.2 1M11.8 11v.1M11.8 14v.1"/></symbol>
+<symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
 <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
 </svg>
 {% if user.is_authenticated %}
@@ -63,23 +72,18 @@
 </div>
 <nav class="side-nav">
 <p class="side-label">Работа</p>
-<a class="side-link" href="{% url 'dashboard' %}" data-tip="Фотографии"{% if section == 'dashboard' and not decision or section == 'photo_detail' or section == 'photo_original' or section == 'photo_lookup' %} aria-current="page"{% endif %}><svg class="icon"><use href="#i-photo"/></svg><span class="side-text">Фотографии</span>{% if nav.review_count %}<span class="side-badge" title="Ждут решения">{{ nav.review_count }}</span>{% endif %}</a>
-<div class="side-sub">
-<a href="{% url 'dashboard' %}?decision=review"{% if section == 'dashboard' and decision == 'review' %} aria-current="page"{% endif %}><span class="dot review"></span>На проверке</a>
-<a href="{% url 'dashboard' %}?decision=accepted"{% if section == 'dashboard' and decision == 'accepted' %} aria-current="page"{% endif %}><span class="dot accepted"></span>Принято</a>
-<a href="{% url 'dashboard' %}?decision=rejected"{% if section == 'dashboard' and decision == 'rejected' %} aria-current="page"{% endif %}><span class="dot rejected"></span>Отклонено</a>
-</div>
-<a class="side-link" href="{% url 'reports' %}" data-tip="Отчёты"{% if section == 'reports' %} aria-current="page"{% endif %}><svg class="icon"><use href="#i-report"/></svg><span class="side-text">Отчёты</span></a>
-<a class="side-link" href="{% url 'chat_history' %}" data-tip="Переписка"{% if section == 'chat_history' %} aria-current="page"{% endif %}><svg class="icon"><use href="#i-chat"/></svg><span class="side-text">Переписка</span></a>
+<a class="side-link" href="{% url 'dashboard' %}" data-tip="Фотографии"{% if section == 'dashboard' or section == 'photo_detail' or section == 'photo_original' or section == 'photo_lookup' %} aria-current="page"{% endif %}><span class="side-icon violet"><svg class="icon"><use href="#i-photo"/></svg></span><span class="side-text">Фотографии</span>{% if nav.review_count %}<span class="side-badge" title="Ждут решения">{{ nav.review_count }}</span>{% endif %}</a>
+<a class="side-link" href="{% url 'reports' %}" data-tip="Отчёты"{% if section == 'reports' %} aria-current="page"{% endif %}><span class="side-icon green"><svg class="icon"><use href="#i-report"/></svg></span><span class="side-text">Отчёты</span></a>
+<a class="side-link" href="{% url 'chat_history' %}" data-tip="Переписка"{% if section == 'chat_history' %} aria-current="page"{% endif %}><span class="side-icon blue"><svg class="icon"><use href="#i-chat"/></svg></span><span class="side-text">Переписка</span></a>
 {% if nav.is_creator %}
 <p class="side-label">Администрирование</p>
-<a class="side-link" href="{% url 'management' %}" data-tip="Управление"{% if section == 'management' or section == 'edit_employee' %} aria-current="page"{% endif %}><svg class="icon"><use href="#i-admin"/></svg><span class="side-text">Управление</span></a>
+<a class="side-link" href="{% url 'management' %}" data-tip="Управление"{% if section == 'management' or section == 'edit_employee' %} aria-current="page"{% endif %}><span class="side-icon amber"><svg class="icon"><use href="#i-admin"/></svg></span><span class="side-text">Управление</span></a>
 <div class="side-sub">
-<a href="{% url 'management' %}#employees">Сотрудники</a>
-<a href="{% url 'management' %}#operators">Входы на сайт</a>
-<a href="{% url 'management' %}#assignments">Задания для визитов</a>
-<a href="{% url 'management' %}#hospitals">Роддома</a>
-<a href="{% url 'management' %}#cleanup">Удаление фото</a>
+<a href="{% url 'management' %}#employees"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>Сотрудники</a>
+<a href="{% url 'management' %}#operators"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>Входы на сайт</a>
+<a href="{% url 'management' %}#assignments"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"/></svg>Задания для визитов</a>
+<a href="{% url 'management' %}#hospitals"><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg>Роддома</a>
+<a href="{% url 'management' %}#cleanup"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удаление фото</a>
 </div>
 {% endif %}
 </nav>
@@ -110,6 +114,33 @@
 <main class="page page-guest">{% block guest %}{% endblock %}</main>
 {% endif %}
 <div class="toasts" aria-live="polite" aria-atomic="false">{% for message in messages %}<div class="toast {{ message.tags }}" role="status"><span>{{ message }}</span><button type="button" class="toast-close" data-toast-close aria-label="Закрыть">×</button></div>{% endfor %}</div>
+<dialog id="photo-panel" class="photo-panel" aria-labelledby="photo-panel-title">
+<div class="pp-shell">
+<header class="pp-head">
+<div class="pp-heading"><strong class="pp-title" id="photo-panel-title">Фото</strong><span class="pp-counter"></span></div>
+<div class="pp-nav">
+<button type="button" class="icon-btn" data-pp-prev title="Предыдущее фото (←)" aria-label="Предыдущее фото"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>
+<button type="button" class="icon-btn" data-pp-next title="Следующее фото (→)" aria-label="Следующее фото"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+<a class="btn btn-secondary btn-sm" data-pp-open href="#" title="Открыть страницу фотографии"><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg><span class="btn-label">Страница фото</span></a>
+<button type="button" class="icon-btn" data-pp-close aria-label="Закрыть"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+</div>
+</header>
+<div class="pp-body">
+<section class="pp-media" aria-label="Фотография">
+<div class="pp-stage"><img class="pp-image" alt=""></div>
+<div class="pp-tools">
+<button type="button" class="pp-tool" data-pp-rotate="-90" title="Повернуть налево"><svg class="icon" aria-hidden="true"><use href="#i-rotate-left"/></svg></button>
+<button type="button" class="pp-tool" data-pp-rotate="90" title="Повернуть направо"><svg class="icon" aria-hidden="true"><use href="#i-rotate-right"/></svg></button>
+<button type="button" class="pp-tool" data-pp-natural aria-pressed="false" title="Исходный размер, без уменьшения"><svg class="icon" aria-hidden="true"><use href="#i-actual"/></svg><span>1:1</span></button>
+<button type="button" class="pp-tool" data-pp-fullscreen title="На весь экран с увеличением"><svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg></button>
+<span class="pp-size"></span>
+<a class="pp-tool pp-download" data-pp-download href="#" title="Скачать оригинал"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>Скачать оригинал</span></a>
+</div>
+</section>
+<aside class="pp-info" aria-label="Данные фотографии"></aside>
+</div>
+</div>
+</dialog>
 <dialog id="photo-viewer" class="photo-viewer-dialog" aria-labelledby="photo-viewer-title">
 <div class="photo-viewer-shell">
 <div class="photo-viewer-header"><strong id="photo-viewer-title">Просмотр фотографии</strong><span class="photo-viewer-hint">Колесо мыши — увеличить, перетаскивание — сдвинуть</span><button type="button" class="photo-viewer-close" data-photo-viewer-close aria-label="Закрыть просмотр">×</button></div>

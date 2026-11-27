@@ -1,5 +1,28 @@
 (() => {
   const decisions = ["accepted", "review", "rejected"];
+  const LABELS = { accepted: "Принято", review: "На проверке", rejected: "Отклонено" };
+
+  // Статичная демо-версия (GitHub Pages) не имеет сервера: ответ собирается
+  // прямо на странице, чтобы кнопки вели себя как в настоящей панели.
+  async function send(form, data, demoResult) {
+    if (window.NUPPI_DEMO) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return demoResult();
+    }
+    const response = await fetch(form.action, {
+      method: "POST",
+      body: data,
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    const contentType = response.headers.get("content-type") || "";
+    const result = contentType.includes("application/json") ? await response.json() : null;
+    if (!response.ok || !result || !result.ok) throw new Error((result && result.error) || "");
+    return result;
+  }
 
   function getStatus(form) {
     let status = form.querySelector(".decision-save-status");
@@ -21,7 +44,7 @@
   }
 
   function updateCounter(decision, change) {
-    const count = document.querySelector(`.status-tab.${decision} .count`);
+    const count = document.querySelector(`.stat-card.${decision} .count, .status-tab.${decision} .count`);
     if (!count) return;
     const value = Number.parseInt(count.textContent, 10);
     if (Number.isFinite(value)) count.textContent = String(Math.max(0, value + change));
@@ -38,8 +61,29 @@
     badge.hidden = value === 0;
   }
 
+  function syncOtherCards(card, result) {
+    // То же фото может быть и в списке, и в открытом окне — обновляем оба.
+    const id = card && card.dataset.photoId;
+    if (!id) return;
+    document.querySelectorAll(`[data-photo-card][data-photo-id="${id}"]`).forEach((other) => {
+      if (other === card) return;
+      other.querySelectorAll(".decision-badge").forEach((badge) => {
+        badge.classList.remove(...decisions);
+        badge.classList.add(result.decision);
+        badge.textContent = result.decision_label;
+      });
+      other.querySelectorAll(".decision-actions button").forEach((button) => {
+        button.classList.toggle("is-selected", button.value === result.decision);
+      });
+      const reason = other.querySelector('input[name="reason"]');
+      const ownReason = card.querySelector('input[name="reason"]');
+      if (reason && ownReason) reason.value = ownReason.value;
+    });
+  }
+
   function updateCard(form, result) {
     const card = form.closest("[data-photo-card]");
+    syncOtherCards(card, result);
     const badge = card && card.querySelector(".decision-badge");
     if (badge) {
       badge.classList.remove(...decisions, "is-updated");
@@ -88,14 +132,18 @@
   function updateMetadataCard(form, result) {
     const card = form.closest("[data-photo-card]");
     if (!card) return;
-    const date = card.querySelector(".photo-package-date span");
-    const mother = card.querySelector(".photo-mother-name span");
-    const qr = card.querySelector(".photo-qr-data span");
-    const codeStatus = card.querySelector(".photo-code-status span");
-    if (date) date.textContent = result.photo_date || "—";
-    if (mother) mother.textContent = result.mother_name || "—";
-    if (qr) qr.textContent = result.qr_data || "—";
-    if (codeStatus) codeStatus.textContent = result.code_status || "—";
+    const id = card.dataset.photoId;
+    const targets = id ? document.querySelectorAll(`[data-photo-card][data-photo-id="${id}"]`) : [card];
+    targets.forEach((target) => {
+      const date = target.querySelector(".photo-package-date span");
+      const mother = target.querySelector(".photo-mother-name span");
+      const qr = target.querySelector(".photo-qr-data span");
+      const codeStatus = target.querySelector(".photo-code-status span");
+      if (date) date.textContent = result.photo_date || "—";
+      if (mother) mother.textContent = result.mother_name || "—";
+      if (qr) qr.textContent = result.qr_data || "—";
+      if (codeStatus) codeStatus.textContent = result.code_status || "—";
+    });
   }
 
   document.addEventListener("submit", async (event) => {
@@ -120,21 +168,16 @@
     setStatus(form, "Сохраняю…", "success");
 
     try {
-      const response = await fetch(form.action, {
-        method: "POST",
-        body: data,
-        credentials: "same-origin",
-        headers: {
-          "Accept": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
+      const card = form.closest("[data-photo-card]");
+      const result = await send(form, data, () => {
+        const badge = card && card.querySelector(".decision-badge");
+        const previous = decisions.find((key) => badge && badge.classList.contains(key)) || "review";
+        return { ok: true, decision: submitter.value, decision_label: LABELS[submitter.value], previous_decision: previous };
       });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.error || "Не удалось сохранить итог.");
       updateCard(form, result);
       setStatus(form, `Сохранено: ${result.decision_label}.`, "success");
-      const number = form.action.match(/photo\/(\d+)\//);
-      if (window.nuppiToast) window.nuppiToast(`Фото${number ? ` №${number[1]}` : ""}: ${result.decision_label}`);
+      const number = (card && card.dataset.photoId) || (form.action.match(/photo\/(\d+)\//) || [])[1];
+      if (window.nuppiToast) window.nuppiToast(`Фото${number ? ` №${number}` : ""}: ${result.decision_label}`);
     } catch (error) {
       setStatus(form, error.message || "Не удалось сохранить итог.", "error");
     } finally {
@@ -152,20 +195,20 @@
     setMetadataStatus(form, "Сохраняю…", "success");
 
     try {
-      const response = await fetch(form.action, {
-        method: "POST",
-        body: new FormData(form),
-        credentials: "same-origin",
-        headers: {
-          "Accept": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
+      const result = await send(form, new FormData(form), () => {
+        const card = form.closest("[data-photo-card]");
+        const code = card && card.querySelector(".photo-code-status span");
+        return {
+          ok: true,
+          photo_date: form.elements.photo_date.value,
+          mother_name: form.elements.mother_name.value.trim(),
+          qr_data: form.elements.qr_data.value.trim(),
+          code_status: code ? code.textContent : "",
+          message: "Данные фотографии сохранены.",
+        };
+      }).catch((error) => {
+        throw new Error(error.message || "Не удалось сохранить данные фотографии.");
       });
-      const contentType = response.headers.get("content-type") || "";
-      const result = contentType.includes("application/json") ? await response.json() : null;
-      if (!response.ok || !result || !result.ok) {
-        throw new Error((result && result.error) || "Не удалось сохранить данные фотографии.");
-      }
       updateMetadataCard(form, result);
       setMetadataStatus(form, result.message || "Данные фотографии сохранены.", "success");
       if (window.nuppiToast) window.nuppiToast(result.message || "Данные фотографии сохранены.");

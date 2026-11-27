@@ -191,7 +191,8 @@ class OriginalPhotoTests(SimpleTestCase):
         self.assertEqual(context['decision_total'], 1)
         self.assertFalse(context['has_filters'])
         self.assertContains(response, reverse('reports'))
-        self.assertContains(response, 'class="status-tab review')
+        self.assertContains(response, 'class="stat-card review')
+        self.assertEqual(context['decision_share'], {'accepted': 0, 'review': 100, 'rejected': 0})
         self.assertNotContains(response, 'Сбросить все')
         self.assertEqual(context['filter_chips'], [])
 
@@ -202,6 +203,34 @@ class OriginalPhotoTests(SimpleTestCase):
         # Убрать город — значит убрать и зависящий от него роддом; страница сбрасывается.
         self.assertEqual(chips['Город']['remove_query'], '')
         self.assertEqual(chips['Роддом']['remove_query'], 'city=%D0%A2%D0%B0%D1%88%D0%BA%D0%B5%D0%BD%D1%82')
+
+    def test_photo_search_finds_number_doctor_medic_and_qr(self):
+        self.add_photo(1, doctor_name='Иванова Анна', qr_data='01-0000000123')
+        self.add_photo(2, sender_telegram_id=2, doctor_name='Петрова Мария')
+        self.add_photo(3, doctor_name='Сидорова Ольга')
+        cases = {
+            'ИВАНОВА': [1],
+            'мария': [2],
+            'Medic B': [2],
+            '01-0000000123': [1],
+            '№3': [3],
+            'нет такого': [],
+        }
+        for query, expected in cases.items():
+            with self.subTest(query=query):
+                _, context = self.dashboard_at(q=query)
+                self.assertEqual(sorted(photo['id'] for photo in context['photos']), expected)
+                self.assertEqual(context['search_text'], query)
+        _, context = self.dashboard_at(q='Иванова')
+        self.assertEqual(context['filter_chips'][0]['title'], 'Поиск')
+
+    def test_reports_page_defaults_to_last_ten_days(self):
+        self.add_photo(1, sent_at='2026-09-02T10:00:00+00:00')
+        self.add_photo(2, sent_at='2026-07-01T10:00:00+00:00')
+        _, context = self.reports_at()
+        self.assertEqual(context['selected_date_from'], '2026-08-25')
+        self.assertEqual(context['selected_date_to'], '2026-09-03')
+        self.assertEqual(context['summary']['photo_count'], 1)
 
     def test_photo_list_sorting_is_whitelisted(self):
         self.add_photo(1, sent_at='2026-09-01T10:00:00+00:00')
@@ -230,7 +259,7 @@ class OriginalPhotoTests(SimpleTestCase):
         response, context = self.reports_at(date_from='2026-09-01', date_to='2026-09-03')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(context['medic_stats']), 1)
-        self.assertContains(response, 'Статистика медиков')
+        self.assertContains(response, 'Статистика сотрудников')
         self.assertContains(response, 'Medic A')
         self.assertContains(response, 'action="/photos/export.xlsx"')
         self.assertContains(response, 'name="date_from" value="2026-09-01"')
@@ -349,6 +378,9 @@ class OriginalPhotoTests(SimpleTestCase):
         self.assertContains(response, 'Фотография принята')
         self.assertContains(response, 'авторизованным операторам')
         self.assertContains(response, reverse('photo_image', args=[1]) + '?thumbnail=1')
+        # В списке диалогов видно последнее сообщение, в окне — разделитель по дню.
+        self.assertContains(response, '<b>Бот:</b> Фотография принята')
+        self.assertContains(response, 'class="chat-day"', count=1)
 
     def test_chat_history_requires_login(self):
         request = self.factory.get(reverse('chat_history'))

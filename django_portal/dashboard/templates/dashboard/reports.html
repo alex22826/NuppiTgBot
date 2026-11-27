@@ -5,66 +5,78 @@
 <div class="page-head">
 <div>
 <h1>Отчёты</h1>
-<p>Выберите нужный отчёт, укажите период и нажмите «Скачать». Файл Excel сохранится на компьютер.</p>
+<p>Выберите период и при необходимости город, роддом, врача или сотрудника. Ниже видно, сколько фото попадёт в каждый отчёт, — останется нажать «Скачать».</p>
 </div>
 </div>
 {% if database_error %}<p class="error">{{ database_error }} Укажите BOT_DB_PATH в файле .env.</p>{% else %}
-<div class="report-grid">
 
+<form class="panel report-filters" method="get" id="report-filters">
+<div class="filter-main">
+<div class="field daterange" data-daterange data-autosubmit><span>Период</span><div class="daterange-inputs"><input type="date" name="date_from" value="{{ selected_date_from }}" aria-label="С даты" required><input type="date" name="date_to" value="{{ selected_date_to }}" aria-label="По дату" required></div></div>
+<label class="field"><span>Город</span><select name="city" onchange="this.form.elements.hospital.value='';this.form.elements.doctor.value='';this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}"{% if item == selected_city %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label class="field"><span>Роддом</span><select name="hospital" onchange="this.form.elements.doctor.value='';this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">{% if selected_city %}Все роддома{% else %}Сначала выберите город{% endif %}</option>{% for item in hospitals %}<option value="{{ item }}"{% if item == selected_hospital %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label class="field"><span>Врач</span><select name="doctor" onchange="this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все врачи</option>{% for group in doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}"{% if doctor == selected_doctor %} selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
+<label class="field"><span>Сотрудник</span><select name="medic" onchange="this.form.requestSubmit?this.form.requestSubmit():this.form.submit()"><option value="">Все сотрудники</option>{% for medic in medics %}<option value="{{ medic.telegram_id }}"{% if medic.telegram_id == selected_medic_id %} selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label>
+<noscript><div class="filter-buttons"><button type="submit">Показать</button></div></noscript>
+</div>
+{% if filter_chips %}<div class="chips" aria-label="Выбранные фильтры">{% for chip in filter_chips %}{% if chip.title != 'Период' %}<a class="chip" href="?{{ chip.remove_query }}" title="Убрать фильтр"><span class="chip-title">{{ chip.title }}:</span> {{ chip.value }}<svg class="icon"><use href="#i-x"/></svg></a>{% endif %}{% endfor %}</div>{% endif %}
+</form>
+
+<div class="period-summary" aria-label="Итоги за период">
+<div class="ps-item"><span class="ps-label">Всего фото</span><b>{{ decision_total }}</b><span class="ps-note">{{ selected_period_label }}</span></div>
+<div class="ps-item accepted"><span class="ps-label">Принято</span><b>{{ decision_counts.accepted }}</b><span class="ps-note"><span class="meter"><i style="width: {{ decision_share.accepted }}%"></i></span>{{ decision_share.accepted }}%</span></div>
+<div class="ps-item rejected"><span class="ps-label">Отклонено</span><b>{{ decision_counts.rejected }}</b><span class="ps-note"><span class="meter"><i style="width: {{ decision_share.rejected }}%"></i></span>{{ decision_share.rejected }}%</span></div>
+<div class="ps-item review"><span class="ps-label">Ждут решения</span><b>{{ decision_counts.review }}</b><span class="ps-note">{% if decision_counts.review %}<a href="{% url 'dashboard' %}?decision=review&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}">Проверить →</a>{% else %}всё проверено{% endif %}</span></div>
+</div>
+
+<div class="report-grid">
 <section class="panel report-card accepted" aria-labelledby="report-full">
-<div class="report-icon"><svg class="icon" aria-hidden="true"><use href="#i-file-check"/></svg></div>
+<div class="report-head"><div class="report-icon"><svg class="icon" aria-hidden="true"><use href="#i-file-check"/></svg></div><span class="report-count"><b>{{ decision_counts.accepted }}</b> фото</span></div>
 <div>
 <h2 id="report-full">Полный отчёт по принятым фото</h2>
-<p class="hint">Для оплаты и сдачи: только фото, которые оператор вручную отметил «Принято». По умолчанию — последние 10 дней.</p>
+<p class="hint">Для оплаты и сдачи. Только фото, которые оператор вручную отметил «Принято», за весь выбранный период.</p>
 </div>
+<ul class="report-points"><li>Период: <b>{{ selected_period_label }}</b></li><li>Учитывает все города и роддома</li></ul>
 <form method="get" action="{% url 'export_full_ten_day_report' %}">
-<div class="form-grid">
-<label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ full_report_date_from }}" required></label>
-<label class="field"><span>По дату</span><input type="date" name="date_to" value="{{ full_report_date_to }}" required></label>
-</div>
-<div class="form-actions"><button class="btn-ok"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать полный Excel</button></div>
+<input type="hidden" name="date_from" value="{{ selected_date_from|default:full_report_date_from }}">
+<input type="hidden" name="date_to" value="{{ selected_date_to|default:full_report_date_to }}">
+<button class="btn-ok"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать полный Excel</button>
 </form>
 </section>
 
 <section class="panel report-card rejected" aria-labelledby="report-rejected">
-<div class="report-icon"><svg class="icon" aria-hidden="true"><use href="#i-file-x"/></svg></div>
+<div class="report-head"><div class="report-icon"><svg class="icon" aria-hidden="true"><use href="#i-file-x"/></svg></div><span class="report-count"><b>{{ decision_counts.rejected }}</b> фото</span></div>
 <div>
 <h2 id="report-rejected">Отчёт по отклонённым фотографиям</h2>
-<p class="hint">Фото, которые оператор отклонил, вместе с самим снимком и комментарием.</p>
+<p class="hint">Фото, которые оператор отклонил, — вместе с самим снимком и комментарием.</p>
 </div>
+<ul class="report-points"><li>Период: <b>{{ selected_period_label }}</b></li><li>С учётом выбранных фильтров</li></ul>
 <form method="get" action="{% url 'export_rejected_photo_report' %}">
-<div class="form-grid">
-<label class="field"><span>Город</span><select name="city"><option value="">Все города</option>{% for item in cities %}<option value="{{ item }}"{% if item == selected_city %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
-<label class="field"><span>Роддом</span><select name="hospital"><option value="">Все роддома</option>{% for item in report_hospital_options %}<option value="{{ item.maternity_hospital }}"{% if item.city == selected_city and item.maternity_hospital == selected_hospital %} selected{% endif %}>{{ item.city }} · {{ item.maternity_hospital }}</option>{% endfor %}</select></label>
-<label class="field"><span>Врач</span><select name="doctor"><option value="">Все врачи</option>{% for group in report_doctor_groups %}<optgroup label="{{ group.label }}">{% for doctor in group.doctors %}<option value="{{ doctor }}"{% if doctor == selected_doctor %} selected{% endif %}>{{ doctor }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>
-<label class="field"><span>Медик</span><select name="medic"><option value="">Все медики</option>{% for medic in report_medics %}<option value="{{ medic.telegram_id }}"{% if medic.telegram_id == selected_medic_id %} selected{% endif %}>{{ medic.full_name }}</option>{% endfor %}</select></label>
-<label class="field"><span>С даты</span><input type="date" name="date_from" value="{{ full_report_date_from }}" required></label>
-<label class="field"><span>По дату</span><input type="date" name="date_to" value="{{ full_report_date_to }}" required></label>
-</div>
-<div class="form-actions"><button class="btn-danger"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать отклонённые фото</button></div>
+{% for key, value in request.GET.items %}{% if key != 'page' and key != 'decision' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+<button class="btn-danger"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать отклонённые фото</button>
 </form>
 </section>
 
 <section class="panel report-card" aria-labelledby="report-list">
-<div class="report-icon"><svg class="icon" aria-hidden="true"><use href="#i-table"/></svg></div>
+<div class="report-head"><div class="report-icon"><svg class="icon" aria-hidden="true"><use href="#i-table"/></svg></div><span class="report-count"><b>{{ summary.photo_count }}</b> фото</span></div>
 <div>
-<h2 id="report-list">Список фото по фильтрам</h2>
-<p class="hint">Все фото с их статусом и данными — по тем же фильтрам, что на странице «Фотографии». Сейчас: {{ selected_period_label|lower }}, найдено {{ summary.photo_count }}.</p>
+<h2 id="report-list">Все фото списком</h2>
+<p class="hint">Таблица всех фото с итогом проверки, врачом, медиком, роддомом и кодом.</p>
 </div>
+<ul class="report-points"><li>Период: <b>{{ selected_period_label }}</b></li><li>С учётом выбранных фильтров</li></ul>
 <form method="get" action="{% url 'export_photos' %}">
 {% for key, value in request.GET.items %}{% if key != 'page' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
-<div class="form-actions"><button><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать Excel</button><a class="btn btn-ghost" href="{% url 'dashboard' %}{% if page_query %}?{{ page_query }}{% endif %}">Изменить фильтры</a></div>
+<button><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать Excel</button>
 </form>
 </section>
-
 </div>
 
 <section class="section" aria-labelledby="medic-stats">
-<div class="section-head"><h2 id="medic-stats">Статистика медиков</h2><span class="count">{{ selected_period_label }}</span><p>Сколько фото прислал каждый медик и чем закончилась проверка. Фильтры берутся со страницы «Фотографии».</p></div>
+<div class="section-head"><h2 id="medic-stats">Статистика сотрудников</h2><span class="count">{{ selected_period_label }}</span><p>Сколько фото прислал каждый сотрудник и чем закончилась проверка. Нажмите на заголовок колонки, чтобы отсортировать.</p></div>
 {% if medic_stats %}<div class="table-wrap"><table data-sortable>
-<thead><tr><th data-sort="text">Медик</th><th class="num hide-sm" data-sort="num">Визиты</th><th class="num" data-sort="num">Фото</th><th class="num" data-sort="num">Принято</th><th class="num" data-sort="num">На проверке</th><th class="num" data-sort="num">Отклонено</th></tr></thead>
-<tbody>{% for medic in medic_stats %}<tr><td data-value="{{ medic.medic_name }}"><div class="person"><span class="avatar-sm" data-avatar="{{ medic.medic_name }}">{{ medic.medic_name|slice:":1"|upper }}</span><div>{{ medic.medic_name }}<small>ID {{ medic.sender_telegram_id }}</small></div></div></td><td class="num hide-sm">{{ medic.visit_count }}</td><td class="num">{{ medic.photo_count }}</td><td class="num">{{ medic.accepted_count }}</td><td class="num">{{ medic.review_count }}</td><td class="num">{{ medic.rejected_count }}</td></tr>{% endfor %}</tbody>
-</table></div>{% else %}<div class="empty"><b>Нет данных</b>За выбранный период медики не присылали фото.</div>{% endif %}
+<thead><tr><th data-sort="text">Сотрудник</th><th class="num hide-sm" data-sort="num">Визиты</th><th class="num" data-sort="num">Фото</th><th class="num" data-sort="num">Принято</th><th class="num" data-sort="num">На проверке</th><th class="num" data-sort="num">Отклонено</th></tr></thead>
+<tbody>{% for medic in medic_stats %}<tr><td data-value="{{ medic.medic_name }}"><div class="person"><span class="avatar-sm" data-avatar="{{ medic.medic_name }}">{{ medic.medic_name|slice:":1"|upper }}</span><div><a class="link-quiet" href="{% url 'dashboard' %}?medic={{ medic.sender_telegram_id }}&amp;date_from={{ selected_date_from }}&amp;date_to={{ selected_date_to }}">{{ medic.medic_name }}</a><small>ID {{ medic.sender_telegram_id }}</small></div></div></td><td class="num hide-sm">{{ medic.visit_count }}</td><td class="num"><b>{{ medic.photo_count }}</b></td><td class="num"><span class="num-pill accepted">{{ medic.accepted_count }}</span></td><td class="num"><span class="num-pill review">{{ medic.review_count }}</span></td><td class="num"><span class="num-pill rejected">{{ medic.rejected_count }}</span></td></tr>{% endfor %}</tbody>
+</table></div>{% else %}<div class="empty"><b>Нет данных</b>За выбранный период сотрудники не присылали фото.</div>{% endif %}
 </section>
 {% endif %}
 {% endblock %}

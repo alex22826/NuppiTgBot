@@ -68,7 +68,7 @@ def dashboard(request):
     return render(request, "dashboard/dashboard.html", photo_list_context(request))
 
 
-FILTER_PARAMETERS = ("city", "hospital", "doctor", "medic", "date_from", "date_to")
+FILTER_PARAMETERS = ("q", "city", "hospital", "doctor", "medic", "date_from", "date_to")
 
 # Сортировка списка: ключ из адреса → (подпись, ORDER BY). Только из этого списка,
 # поэтому значение из запроса никогда не попадает в SQL напрямую.
@@ -88,11 +88,14 @@ def active_filter_chips(request, labels):
     chips = []
     for name in FILTER_PARAMETERS:
         value = request.GET.get(name, "").strip()
-        if not value:
+        if not value or (name == "date_to" and request.GET.get("date_from", "").strip()):
             continue
         query = request.GET.copy()
         query.pop(name, None)
         query.pop("page", None)
+        if name == "date_from":
+            # Период показывается одной меткой и убирается целиком.
+            query.pop("date_to", None)
         if name == "city":
             query.pop("hospital", None)
             query.pop("doctor", None)
@@ -126,6 +129,7 @@ def photo_list_context(request):
         selected_decision = ""
     selected_date_from, selected_date_to = requested_period(request)
     _, full_report_date_from, full_report_date_to = full_report_period()
+    search_text = " ".join(request.GET.get("q", "").split())[:100]
     selected_sort = request.GET.get("sort", DEFAULT_PHOTO_SORT).strip()
     if selected_sort not in PHOTO_SORTS:
         selected_sort = DEFAULT_PHOTO_SORT
@@ -256,6 +260,23 @@ def photo_list_context(request):
         if selected_medic:
             scope_conditions.append("p.sender_telegram_id = ?")
             scope_parameters.append(int(selected_medic))
+        if search_text:
+            # Поиск по номеру фото, врачу, медику, QR-коду и роддому.
+            # DOCTOR_SEARCH_KEY понимает кириллицу и не учитывает регистр, пробелы и знаки.
+            search_key = doctor_search_key(search_text)
+            search_parts, search_values = [], []
+            # «№3» или «#3» — это именно номер фотографии, а не часть QR-кода.
+            number_only = search_text[:1] in "№#" and search_text[1:].strip().isdigit()
+            if search_key and not number_only:
+                for column in ("p.doctor_name", "sender.full_name", photo_hospital, qr_data):
+                    search_parts.append(f"DOCTOR_SEARCH_KEY(COALESCE({column}, '')) LIKE ?")
+                    search_values.append(f"%{search_key}%")
+            digits = search_text.lstrip("№#").strip()
+            if digits.isdigit():
+                search_parts.append("p.id = ?")
+                search_values.append(int(digits))
+            scope_conditions.append("(" + " OR ".join(search_parts or ["0"]) + ")")
+            scope_parameters.extend(search_values)
         conditions, parameters = list(scope_conditions), list(scope_parameters)
         # ISO timestamps begin with YYYY-MM-DD, so direct range comparisons
         # preserve the previous DATE() behaviour while allowing SQLite to use
@@ -374,12 +395,13 @@ def photo_list_context(request):
 
     medic_names = {str(row["telegram_id"]): row["full_name"] for row in medic_options}
     filter_chips = active_filter_chips(request, {
+        "q": ("Поиск", search_text),
         "city": ("Город", city),
         "hospital": ("Роддом", hospital),
         "doctor": ("Врач", selected_doctor),
         "medic": ("Медик", medic_names.get(selected_medic, selected_medic)),
-        "date_from": ("С", format_selected_period(selected_date_from, selected_date_from) if selected_date_from else ""),
-        "date_to": ("По", format_selected_period(selected_date_to, selected_date_to) if selected_date_to else ""),
+        "date_from": ("Период", format_selected_period(selected_date_from, selected_date_to) if selected_date_from else ""),
+        "date_to": ("Период", format_selected_period(None, selected_date_to) if selected_date_to else ""),
     })
     view_query = request.GET.copy()
     for name in ("page", "sort", "group"):
@@ -424,6 +446,11 @@ def photo_list_context(request):
         "decision_total": sum(decision_counts.values()),
         "photo_sorts": {key: label for key, (label, _order) in PHOTO_SORTS.items()},
         "selected_sort": selected_sort,
+        "search_text": search_text,
+        "decision_share": {
+            key: round(value * 100 / sum(decision_counts.values())) if sum(decision_counts.values()) else 0
+            for key, value in decision_counts.items()
+        },
         "group_by_flag": group_by_flag,
         "filter_chips": filter_chips,
         "view_query": view_query.urlencode(),
