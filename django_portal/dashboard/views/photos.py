@@ -30,6 +30,7 @@ from ..catalog import (
 from ..db import (
     bot_database,
     database_table_exists,
+    ensure_package_columns,
     ensure_photo_checks_table,
     photo_columns,
 )
@@ -48,9 +49,10 @@ from ..periods import (
     requested_period,
 )
 from ..photos import (
+    PACKAGE_BRANDS,
+    PACKAGE_FORMULAS,
     cached_photo_thumbnail,
     is_copy_or_crop_status,
-    make_photo_thumbnail,
     photo_details,
     photo_details_for_operator,
     photo_review_group,
@@ -58,6 +60,7 @@ from ..photos import (
     resolve_original_photo,
 )
 from ..qr_codes import QR_REGION_CODE_PATTERN, canonical_qr_data, qr_code_status
+from ..similar import find_similar_photos, photo_checks_summary
 from ..text import (
     decode_photo_location,
     doctor_search_condition,
@@ -535,6 +538,7 @@ def photo_detail(request, photo_id):
         if not photo_in_scope(connection, request.user, photo_id):
             raise Http404
         photo = photo_details_for_operator(connection, photo_id)
+        similar = find_similar_photos(connection, photo, user_regions(request.user)) if photo else []
     finally:
         connection.close()
     if not photo:
@@ -546,9 +550,41 @@ def photo_detail(request, photo_id):
         event.action_label = audit.action_label(event.action)
     return render(request, "dashboard/photo_detail.html", {
         "photo": photo,
+        "similar": similar,
+        "checks": photo_checks_summary(photo, similar),
+        "package_brands": PACKAGE_BRANDS,
+        "package_formulas": PACKAGE_FORMULAS,
         "history": history,
         "review_group": photo_review_group(photo),
         "return_to": request.get_full_path(),
+        "is_creator": is_creator(request.user),
+    })
+
+
+@permission_required("photos.view")
+def photo_compare(request, photo_id, other_id):
+    """Два фото рядом: это и найденное похожее, с причинами совпадения."""
+    connection = bot_database()
+    if not connection:
+        raise Http404
+    try:
+        if not photo_in_scope(connection, request.user, photo_id):
+            raise Http404
+        photo = photo_details_for_operator(connection, photo_id)
+        if not photo:
+            raise Http404
+        similar = find_similar_photos(connection, photo, user_regions(request.user), limit=200)
+        match = next((item for item in similar if item["id"] == other_id), None)
+        # Сравнивать можно только то, что система сама нашла похожим и что видно этой роли.
+        if not match or not match["in_scope"]:
+            raise Http404
+        other = photo_details_for_operator(connection, other_id)
+    finally:
+        connection.close()
+    if not other:
+        raise Http404
+    return render(request, "dashboard/photo_compare.html", {
+        "photo": photo, "other": other, "match": match,
         "is_creator": is_creator(request.user),
     })
 
@@ -578,6 +614,9 @@ def photo_image(request, photo_id):
     if not connection:
         raise Http404
     thumbnail_requested = request.GET.get("thumbnail") == "1"
+    # preview=1 — рабочая копия 1600 px для карточки, thumbnail=1 — превью списка.
+    preview_requested = request.GET.get("preview") == "1" and not thumbnail_requested
+    resized = thumbnail_requested or preview_requested
     try:
         with connection:
             # Руководителю доступны фото своих регионов и оригиналы для их копий.
@@ -595,34 +634,26 @@ def photo_image(request, photo_id):
                 raise Http404
 
             image_digest = photo_identity["image_digest"]
-            if thumbnail_requested and image_digest:
-                cache_path = photo_thumbnail_cache_path(photo_id, image_digest)
-                try:
-                    if cache_path.exists():
-                        image_bytes = cache_path.read_bytes()
-                    else:
-                        photo = connection.execute(
-                            "SELECT image FROM photos WHERE id = ?", (photo_id,),
-                        ).fetchone()
-                        if not photo:
-                            raise Http404
-                        image_bytes = cached_photo_thumbnail(photo_id, image_digest, photo["image"])
-                except OSError:
-                    photo = connection.execute(
-                        "SELECT image FROM photos WHERE id = ?", (photo_id,),
-                    ).fetchone()
-                    if not photo:
-                        raise Http404
-                    image_bytes = make_photo_thumbnail(photo["image"])
-            else:
+            suffix = "-preview" if preview_requested else ""
+            cache_path = (
+                photo_thumbnail_cache_path(photo_id, image_digest, suffix)
+                if resized and image_digest else None
+            )
+            image_bytes = None
+            try:
+                if cache_path and cache_path.exists():
+                    image_bytes = cache_path.read_bytes()
+            except OSError:
+                image_bytes = None
+            if image_bytes is None:
                 photo = connection.execute(
                     "SELECT image FROM photos WHERE id = ?", (photo_id,),
                 ).fetchone()
                 if not photo:
                     raise Http404
                 image_bytes = (
-                    cached_photo_thumbnail(photo_id, image_digest, photo["image"])
-                    if thumbnail_requested else photo["image"]
+                    cached_photo_thumbnail(photo_id, image_digest, photo["image"], preview=preview_requested)
+                    if resized else photo["image"]
                 )
     finally:
         connection.close()
@@ -648,6 +679,11 @@ def edit_photo_metadata(request, photo_id):
     raw_qr_data = request.POST.get("qr_data", "").strip()
     qr_data = canonical_qr_data(raw_qr_data)
     photo_date = requested_day(raw_date)
+    # Марка и номер смеси приходят только из формы карточки фото.
+    has_package_fields = "package_brand" in request.POST or "package_formula" in request.POST
+    package_brand = " ".join(request.POST.get("package_brand", "").split()).upper()[:40]
+    package_formula = " ".join(request.POST.get("package_formula", "").split())[:10]
+    package_before = {}
     if raw_date and not photo_date:
         error = "Дата должна быть указана в формате ГГГГ-ММ-ДД."
         if wants_json:
@@ -758,6 +794,15 @@ def edit_photo_metadata(request, photo_id):
                 review_reason = current_reason
 
         code_status = qr_code_status(qr_data, photo["city"])
+        if has_package_fields:
+            ensure_package_columns(connection)
+            package_before = dict(connection.execute(
+                "SELECT package_brand, package_formula FROM photos WHERE id = ?", (photo_id,),
+            ).fetchone())
+            connection.execute(
+                "UPDATE photos SET package_brand = ?, package_formula = ? WHERE id = ?",
+                (package_brand or None, package_formula or None, photo_id),
+            )
         result = connection.execute(
             """UPDATE photos
                SET photo_date = ?, mother_name = ?, qr_data = ?, code_status = ?,
@@ -806,6 +851,11 @@ def edit_photo_metadata(request, photo_id):
         ("photo_date", "дата", photo["old_photo_date"], photo_date or None),
         ("mother_name", "ФИО", photo["old_mother_name"], mother_name or None),
         ("qr_data", "QR", photo["old_qr_data"], qr_data),
+        *(
+            (("package_brand", "марка", package_before.get("package_brand"), package_brand or None),
+             ("package_formula", "номер смеси", package_before.get("package_formula"), package_formula or None))
+            if has_package_fields else ()
+        ),
     ):
         if (old or None) != (new or None):
             changes[field] = {"label": label, "old": old or "", "new": new or ""}
@@ -829,6 +879,8 @@ def edit_photo_metadata(request, photo_id):
             "review_status": review_status,
             "review_reason": review_reason,
             "original_photo_id": original_photo_id,
+            "package_brand": package_brand,
+            "package_formula": package_formula,
             "message": message,
         })
     messages.success(request, message)

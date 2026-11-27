@@ -4,6 +4,7 @@
 {% if photo.manual_reviewer %}<small class="reviewed-by"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>Проверил {{ photo.manual_reviewer }}{% if photo.manual_at_display %} · {{ photo.manual_at_display }}{% endif %}</small>{% endif %}
 <label class="sr-only" for="reason-{{ photo.id }}">Комментарий оператора</label>
 <input id="reason-{{ photo.id }}" name="reason" value="{{ photo.manual_reason|default:'' }}" maxlength="500" placeholder="Комментарий для медика">
+{% if nav.reject_reasons %}<div class="reason-chips" aria-label="Готовые причины">{% for reason in nav.reject_reasons %}<button type="button" class="reason-chip" data-reason="{{ reason }}">{{ reason }}</button>{% endfor %}</div>{% endif %}
 <div class="decision-actions">
 <button type="submit" class="accept{% if photo.manual_decision == 'accepted' %} is-selected{% endif %}" name="decision" value="accepted"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Принять</button>
 {% if 'photos.reject' in nav.perms or not nav %}<button type="submit" class="reject{% if photo.manual_decision == 'rejected' %} is-selected{% endif %}" name="decision" value="rejected"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>Отклонить</button>{% endif %}

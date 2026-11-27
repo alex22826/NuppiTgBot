@@ -10,42 +10,75 @@
 </div>
 <div class="detail-layout">
 <div class="panel detail-image">
-<a class="photo-viewer-link" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?thumbnail=1" alt="Фотография №{{ photo.id }}" decoding="async"></a>
-<p class="hint">Нажмите на фото, чтобы открыть его крупно, повернуть или увеличить.</p>
+<a class="photo-viewer-link" href="{% url 'photo_image' photo.id %}" data-download-url="{% url 'photo_image' photo.id %}?download=1" target="_blank" rel="noopener"><img src="{% url 'photo_image' photo.id %}?preview=1" alt="Фотография №{{ photo.id }}" decoding="async"></a>
+<p class="hint">Рабочая копия. Нажмите на фото, чтобы открыть оригинал крупно, повернуть или увеличить.</p>
 </div>
 <div class="detail-side flag-{{ review_group|default:"clear" }}" data-photo-card data-photo-id="{{ photo.id }}">
+
 <section class="panel">
 <div class="panel-head"><h2>Итог проверки</h2><span class="decision-badge {{ photo.decision }}">{{ photo.decision_label }}</span></div>
-<div class="flag" style="margin-bottom:14px"><div><b>{{ photo.review_status|default:'Не проверено' }}</b><br><span class="photo-code-status"><span>{{ photo.code_status|default:"Код: нет данных" }}</span></span>{% if photo.review_reason %}<br>{{ photo.review_reason }}{% endif %}</div></div>
+{% if photo.manual_reason and photo.decision == 'rejected' %}<p class="operator-comment" style="margin-bottom:12px">Причина отклонения: {{ photo.manual_reason }}</p>{% endif %}
 {% include 'dashboard/photo_decision_form.html' with photo=photo %}
 </section>
-<section class="panel">
-<div class="panel-head"><h2>Данные фотографии</h2><span class="hint">Только чтение</span></div>
+
+<section class="panel" aria-labelledby="checks-{{ photo.id }}">
+<div class="panel-head"><h2 id="checks-{{ photo.id }}">Проверки</h2><span class="hint">автоматика подсвечивает, решает оператор</span></div>
+<ul class="check-list">{% for check in checks %}<li class="check-row {{ check.tone }}"><span class="check-dot" aria-hidden="true"></span><span class="check-title">{{ check.title }}</span><span class="check-text">{{ check.text }}</span></li>{% endfor %}</ul>
+{% if photo.review_reason %}<p class="hint" style="margin-top:10px">{{ photo.review_reason }}</p>{% endif %}
+</section>
+
+<section class="panel" aria-labelledby="similar-{{ photo.id }}">
+<div class="panel-head"><h2 id="similar-{{ photo.id }}">Похожие фото</h2><span class="count-pill">{{ similar|length }}</span></div>
+{% if similar %}<ul class="similar-list">{% for item in similar %}<li>
+{% if item.in_scope %}<a class="similar-item" href="{% url 'photo_compare' photo.id item.id %}" title="Сравнить рядом">
+<img src="{% url 'photo_image' item.id %}?thumbnail=1" alt="Фото №{{ item.id }}" loading="lazy">
+{% else %}<div class="similar-item is-foreign"><span class="similar-lock"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg></span>{% endif %}
+<div class="similar-body">
+<div class="similar-top"><b>№{{ item.id }}</b><span class="decision-badge {{ item.decision }}">{{ item.decision_label }}</span>{% if item.earlier %}<span class="similar-when">раньше</span>{% else %}<span class="similar-when later">позже</span>{% endif %}</div>
+<div class="similar-reasons">{% for reason in item.reasons %}<span class="reason-tag {{ reason.code }}" title="{{ reason.detail }}">{{ reason.label }}</span>{% endfor %}</div>
+<small>{% if item.in_scope %}{{ item.sender_name }} · {% endif %}{{ item.sent_at_display }}{% if item.in_scope %} · {{ item.city }}{% else %} · другой регион{% endif %}</small>
+</div>
+{% if item.in_scope %}<span class="similar-go">Сравнить →</span></a>{% else %}</div>{% endif %}
+</li>{% endfor %}</ul>
+{% else %}<p class="hint">Система не нашла связанных фото: тот же файл, код, ФИО с датой или похожий снимок.</p>{% endif %}
+</section>
+
+<section class="panel" aria-labelledby="package-{{ photo.id }}">
+<div class="panel-head"><h2 id="package-{{ photo.id }}">Данные с упаковки</h2></div>
 <dl class="facts">
-<dt>Номер</dt><dd>№{{ photo.id }}</dd>
-<dt>Врач</dt><dd>{{ photo.doctor_name|default:'Не указан' }}</dd>
-<dt>Медик</dt><dd>{{ photo.sender_name }} <span class="muted">· ID {{ photo.sender_telegram_id }}</span></dd>
-<dt>Город и роддом</dt><dd>{{ photo.city }} · {{ photo.maternity_hospital }}</dd>
-<dt>Отправлено</dt><dd>{{ photo.sent_at_display }}</dd>
-<dt>QR/Data Matrix</dt><dd class="photo-qr-data"><span>{{ photo.qr_data|default:'—' }}</span></dd>
-<dt>Дата на упаковке</dt><dd class="photo-package-date"><span>{{ photo.photo_date|default:'—' }}</span></dd>
+<dt>Марка</dt><dd class="photo-package-brand"><span>{{ photo.package_brand|default:photo.package_brand_auto|default:'—' }}</span>{% if not photo.package_brand and photo.package_brand_auto %} <small class="muted">по автопроверке</small>{% endif %}</dd>
+<dt>Номер смеси</dt><dd class="photo-package-formula"><span>{{ photo.package_formula|default:photo.package_formula_auto|default:'—' }}</span></dd>
+<dt>ФИО</dt><dd class="photo-mother-name"><span>{{ photo.mother_name|default:'—' }}</span></dd>
+<dt>Дата</dt><dd class="photo-package-date"><span>{{ photo.photo_date|default:'—' }}</span></dd>
+<dt>Код на упаковке</dt><dd class="photo-qr-data"><span>{{ photo.qr_data|default:'—' }}</span></dd>
 <dt>Номер на упаковке</dt><dd>{{ photo.package_number|default:'—' }}</dd>
-<dt>Роженица</dt><dd class="photo-mother-name"><span>{{ photo.mother_name|default:'—' }}</span></dd>
+</dl>
+<details class="inline-edit">
+<summary><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg>Исправить данные с упаковки</summary>
+<div class="collapsible-body">{% include 'dashboard/photo_edit_form.html' with photo=photo %}</div>
+</details>
+</section>
+
+<section class="panel" aria-labelledby="sent-{{ photo.id }}">
+<div class="panel-head"><h2 id="sent-{{ photo.id }}">Отправка</h2></div>
+<dl class="facts">
+<dt>Отправитель</dt><dd>{{ photo.sender_name }} <span class="muted">· ID {{ photo.sender_telegram_id }}</span></dd>
+<dt>Дата и время</dt><dd>{{ photo.sent_at_display }}</dd>
+<dt>Регион</dt><dd>{{ photo.city }}</dd>
+<dt>Роддом</dt><dd>{{ photo.maternity_hospital }}</dd>
+<dt>Врач</dt><dd>{{ photo.doctor_name|default:'Не указан' }}</dd>
 {% if photo.ai_generated_percent is not None %}<dt>Вероятность ИИ</dt><dd>{{ photo.ai_generated_percent|floatformat:1 }}%</dd>{% endif %}
 </dl>
 </section>
+
 {% if history or photo.manual_reviewer %}<section class="panel">
 <div class="panel-head"><h2>История</h2>{% if 'audit.view' in nav.perms %}<a class="hint" href="{% url 'journal' %}?object_type=photo&amp;object_id={{ photo.id }}">Весь журнал →</a>{% endif %}</div>
 {% if history %}<ol class="timeline">{% for event in history %}<li class="timeline-item {{ event.action }}"><span class="timeline-dot"></span><div><b>{{ event.action_label }}</b> · {{ event.username|default:"система" }}<small>{{ event.created_at|date:"d.m.Y H:i" }}</small><p>{{ event.summary }}</p></div></li>{% endfor %}</ol>
 {% else %}<p class="hint">Проверил: <b>{{ photo.manual_reviewer }}</b> · {{ photo.manual_at_display }}. Подробная история ведётся с момента обновления сайта.</p>{% endif %}
 </section>{% endif %}
-<details class="panel collapsible">
-<summary><span class="summary-icon"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg></span>Исправить дату, ФИО или QR<span class="chev"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></span></summary>
-<div class="collapsible-body">{% include 'dashboard/photo_edit_form.html' with photo=photo %}</div>
-</details>
+
 <div class="btn-row">
-<a class="btn btn-secondary" href="{% url 'photo_image' photo.id %}?download=1"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать фотографию</a>
-{% include 'dashboard/photo_original_link.html' with photo=photo %}
+<a class="btn btn-secondary" href="{% url 'photo_image' photo.id %}?download=1"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Скачать оригинал</a>
 {% if 'photos.delete' in nav.perms %}<form class="inline-form" method="post" action="{% url 'delete_photo' photo.id %}" onsubmit="return confirm('Удалить фотографию №{{ photo.id }} без возможности восстановления?')">{% csrf_token %}<input type="hidden" name="next" value="{% url 'dashboard' %}"><button class="btn-danger-outline"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Удалить фото</button></form>{% endif %}
 </div>
 </div>

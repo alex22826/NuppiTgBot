@@ -5,7 +5,7 @@ import sqlite3
 
 from .access import region_condition, user_permissions, user_regions, user_role
 from .db import bot_database, database_table_exists
-from .decision_rules import DECISION_REVIEW
+from .decision_rules import DECISION_REVIEW, REJECTION_REASONS
 from .roles import role_label
 
 logger = logging.getLogger(__name__)
@@ -56,5 +56,6 @@ def navigation(request):
             "regions": regions or [],
             "is_creator": "users.manage" in permissions,
             "review_count": review_count(regions) if "photos.view" in permissions else None,
+            "reject_reasons": REJECTION_REASONS,
         },
     }

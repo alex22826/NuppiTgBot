@@ -2,6 +2,11 @@
 <input type="hidden" name="next" value="{{ return_to|default:request.get_full_path }}">
 <label class="field"><span>Дата на упаковке</span><input type="date" name="photo_date" value="{{ photo.photo_date|default:'' }}"></label>
 <label class="field"><span>ФИО роженицы</span><input name="mother_name" value="{{ photo.mother_name|default:'' }}" maxlength="200"></label>
+{% if package_brands %}<div class="field-pair">
+<label class="field"><span>Марка</span><input name="package_brand" value="{{ photo.package_brand|default:photo.package_brand_auto|default:'' }}" list="package-brands" maxlength="40" placeholder="NUPPI"></label>
+<label class="field"><span>Номер смеси</span><select name="package_formula"><option value="">—</option>{% for formula in package_formulas %}<option value="{{ formula }}"{% if formula == photo.package_formula or not photo.package_formula and formula == photo.package_formula_auto %} selected{% endif %}>{{ formula }}</option>{% endfor %}</select></label>
+</div>
+<datalist id="package-brands">{% for brand in package_brands %}<option value="{{ brand }}">{% endfor %}</datalist>{% endif %}
 <label class="field"><span>QR / Data Matrix</span><input name="qr_data" value="{{ photo.qr_data|default:'' }}" maxlength="30" inputmode="numeric" placeholder="01-0000000123"></label>
 <small class="hint">Дату и ФИО вписывает оператор. Если код не распознался, впишите его вручную. Копией считается совпадение кода или одновременно ФИО и даты.</small>
 <button type="submit" class="btn-secondary">Сохранить дату, ФИО и QR</button>

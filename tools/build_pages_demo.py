@@ -185,7 +185,40 @@ def seed_bot_database(rnd: random.Random) -> list[int]:
                  names[telegram_id] if direction == "incoming" else "Оператор", index + 1,
                  (now - timedelta(hours=10 - index)).isoformat()),
             )
+    link_demo_duplicates(bot, photo_ids)
     return photo_ids
+
+
+def link_demo_duplicates(bot, photo_ids):
+    """Несколько связанных фото, чтобы в карточке было что показать в «Похожих»."""
+    if len(photo_ids) < 6:
+        return
+    first, second, third, fourth = photo_ids[0], photo_ids[3], photo_ids[5], photo_ids[1]
+    with bot.connect() as con:
+        # Та же роженица и дата на двух разных снимках.
+        for photo_id in (first, second):
+            con.execute(
+                "UPDATE photos SET mother_name = ?, photo_date = ? WHERE id = ?",
+                ("Абдуллаева Сабина", "2026-11-20", photo_id),
+            )
+        # Тот же код на упаковке у двух фото разных дней.
+        code = con.execute("SELECT qr_data FROM photos WHERE id = ?", (third,)).fetchone()[0]
+        if code:
+            con.execute("UPDATE photos SET qr_data = ? WHERE id = ?", (code, fourth))
+        # Повторно отправленный тот же файл.
+        source = con.execute(
+            "SELECT sender_telegram_id, medic_telegram_id, medic_code, doctor_name, image_digest, qr_data, "
+            "maternity_hospital, image, sent_at FROM photos WHERE id = ?", (first,),
+        ).fetchone()
+        cursor = con.execute(
+            """INSERT INTO photos (sender_telegram_id, medic_telegram_id, medic_code, doctor_name,
+                   image_digest, qr_data, maternity_hospital, review_status, review_reason, code_status,
+                   telegram_file_id, image, sent_at, original_photo_id)
+               VALUES (?,?,?,?,?,?,?,'Возможная копия','Повторно отправлен тот же файл',?, 'demo', ?, ?, ?)""",
+            (source[0], source[1], source[2], source[3], source[4], source[5], source[6],
+             bot.qr_code_status(source[5], "Ташкент"), source[7], source[8], first),
+        )
+        photo_ids.append(cursor.lastrowid)
 
 
 class SiteSnapshot:
@@ -214,6 +247,10 @@ class SiteSnapshot:
             self.chats[telegram_id] = f"chats-{telegram_id}.html"
         for photo_id in photo_ids:
             self.pages[f"/photo/{photo_id}/view/"] = f"photo/{photo_id}.html"
+            # Сравнения с похожими фото, найденными в карточке.
+            detail = client.get(f"/photo/{photo_id}/view/").content.decode()
+            for left, right in re.findall(r"/photo/(\d+)/compare/(\d+)/", detail):
+                self.pages[f"/photo/{left}/compare/{right}/"] = f"photo/compare-{left}-{right}.html"
             # Страница «оригинала» есть только у фото, помеченных как копия.
             if client.get(f"/photo/{photo_id}/original/").status_code == 200:
                 self.pages[f"/photo/{photo_id}/original/"] = f"photo/{photo_id}-original.html"

@@ -23,6 +23,7 @@ urlpatterns = [
     path("photo/<int:photo_id>/", views.photo_image, name="photo_image"),
     path("photo/<int:photo_id>/view/", views.photo_detail, name="photo_detail"),
     path("photo/<int:photo_id>/original/", views.photo_original, name="photo_original"),
+    path("photo/<int:photo_id>/compare/<int:other_id>/", views.photo_compare, name="photo_compare"),
     path("photo/<int:photo_id>/edit/", views.edit_photo_metadata, name="edit_photo_metadata"),
     path("photo/<int:photo_id>/decision/", views.set_photo_decision, name="set_photo_decision"),
     path("photo/<int:photo_id>/delete/", views.delete_photo, name="delete_photo"),
