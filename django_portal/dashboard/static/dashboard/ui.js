@@ -69,6 +69,60 @@
     if (button) dismiss(button.closest(".toast"));
   });
 
+  /* ---------- Полоса загрузки при переходе на другую страницу ---------- */
+  const progress = document.querySelector(".nav-progress");
+  const startProgress = () => {
+    if (!progress) return;
+    progress.classList.remove("is-loading");
+    void progress.offsetWidth;
+    progress.classList.add("is-loading");
+  };
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a[href]");
+    if (!link || event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (link.target === "_blank" || link.hasAttribute("download")) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || url.pathname.endsWith(".xlsx") || url.searchParams.has("download")) return;
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+    startProgress();
+  });
+  document.addEventListener("submit", (event) => {
+    // Формы, которые сохраняются без перезагрузки, полосу не показывают.
+    setTimeout(() => {
+      if (event.defaultPrevented) return;
+      const action = (event.submitter && event.submitter.getAttribute("formaction")) || event.target.getAttribute("action") || "";
+      if (!action.endsWith(".xlsx")) startProgress();
+    }, 0);
+  });
+  window.addEventListener("pageshow", () => progress && progress.classList.remove("is-loading"));
+
+  /* ---------- Меню «Ещё»: одно открытое, закрытие кликом мимо и Esc ---------- */
+  const menus = () => document.querySelectorAll("details.menu[open]");
+  document.addEventListener("toggle", (event) => {
+    const opened = event.target;
+    if (!(opened instanceof HTMLDetailsElement) || !opened.classList.contains("menu") || !opened.open) return;
+    menus().forEach((menu) => { if (menu !== opened) menu.open = false; });
+  }, true);
+  document.addEventListener("click", (event) => {
+    menus().forEach((menu) => { if (!menu.contains(event.target)) menu.open = false; });
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    menus().forEach((menu) => {
+      menu.open = false;
+      menu.querySelector("summary")?.focus();
+    });
+  });
+
+  /* ---------- Аватары: постоянный цвет для каждого имени ---------- */
+  document.querySelectorAll("[data-avatar]").forEach((avatar) => {
+    const name = (avatar.dataset.avatar || avatar.textContent || "").trim();
+    let hash = 0;
+    for (const char of name) hash = (hash * 31 + char.codePointAt(0)) % 360;
+    avatar.style.setProperty("--h", String(hash));
+  });
+
   /* ---------- Поочерёдное появление карточек ---------- */
   document.querySelectorAll("[data-stagger]").forEach((container) => {
     [...container.children].forEach((child, index) => {

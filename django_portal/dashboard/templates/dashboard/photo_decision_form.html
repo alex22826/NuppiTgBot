@@ -4,8 +4,8 @@
 <label class="sr-only" for="reason-{{ photo.id }}">Комментарий оператора</label>
 <input id="reason-{{ photo.id }}" name="reason" value="{{ photo.manual_reason|default:'' }}" maxlength="500" placeholder="Комментарий для медика">
 <div class="decision-actions">
-<button type="submit" class="accept{% if photo.manual_decision == 'accepted' %} is-selected{% endif %}" name="decision" value="accepted">✓ Принять</button>
-<button type="submit" class="reject{% if photo.manual_decision == 'rejected' %} is-selected{% endif %}" name="decision" value="rejected">✕ Отклонить</button>
+<button type="submit" class="accept{% if photo.manual_decision == 'accepted' %} is-selected{% endif %}" name="decision" value="accepted"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Принять</button>
+<button type="submit" class="reject{% if photo.manual_decision == 'rejected' %} is-selected{% endif %}" name="decision" value="rejected"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>Отклонить</button>
 <button type="submit" class="review{% if photo.manual_decision == 'review' %} is-selected{% endif %}" name="decision" value="review">Вернуть «На проверку»</button>
 </div>
 </form>
