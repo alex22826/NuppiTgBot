@@ -11,9 +11,9 @@ from django.urls import reverse
 
 import bot
 
-from . import views
-from . import photos as site_photos
-from .decision_rules import DECISION_REVIEW, automatic_photo_decision
+from .. import views
+from .. import photos as site_photos
+from ..decision_rules import DECISION_REVIEW, automatic_photo_decision
 
 
 class DecisionRuleTests(SimpleTestCase):

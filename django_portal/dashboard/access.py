@@ -8,12 +8,16 @@ from django.core.exceptions import PermissionDenied
 
 
 def is_creator(user):
-    """Создатель определяется только явно заданным логином сайта."""
-    return bool(
-        user.is_authenticated
-        and settings.CREATOR_DJANGO_USERNAME
-        and user.username == settings.CREATOR_DJANGO_USERNAME
-    )
+    """Создатель — логин из CREATOR_DJANGO_USERNAME.
+
+    Если логин не задан, создателями считаются суперпользователи: так сайт сразу
+    готов к работе после ``python manage.py createsuperuser``.
+    """
+    if not user.is_authenticated:
+        return False
+    if settings.CREATOR_DJANGO_USERNAME:
+        return user.username == settings.CREATOR_DJANGO_USERNAME
+    return bool(getattr(user, "is_superuser", False))
 
 
 def creator_required(view):

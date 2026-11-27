@@ -27,3 +27,4 @@ django_portal/staticfiles/
 /nuppi_f_1_300.png
 /nuppi_gold_1_300.png
 .venv/
+.django_secret_key

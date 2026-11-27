@@ -7,6 +7,8 @@ from datetime import timezone as datetime_timezone
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -466,6 +468,12 @@ def add_site_operator(request):
     user_model = get_user_model()
     if user_model.objects.filter(username=username).exists():
         messages.error(request, "Такой логин сайта уже существует.")
+        return redirect("dashboard")
+    try:
+        # Те же правила, что и при createsuperuser: не слишком простой, не только цифры.
+        validate_password(password, user_model(username=username))
+    except ValidationError as error:
+        messages.error(request, "Пароль не подходит: " + " ".join(error.messages))
         return redirect("dashboard")
     user_model.objects.create_user(username=username, password=password, is_staff=False, is_superuser=False)
     messages.success(request, f"Создан доступ оператора к сайту: {username}.")
